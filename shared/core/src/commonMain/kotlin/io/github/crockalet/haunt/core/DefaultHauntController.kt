@@ -68,7 +68,10 @@ class DefaultHauntController(
             transition(newSession = false) { it }
         }
 
-    /** Current timed-playback multiplier (see [setPlaybackRate]). */
+    /**
+     * Current timed-playback multiplier (see [setPlaybackRate]). It persists across [playRoute]
+     * calls, so it may be set before or after starting a recorded track; default 1.0.
+     */
     val playbackRate: Double get() = core.value.playbackRate
 
     init {
