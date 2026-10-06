@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -28,7 +29,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests
-        run: ./gradlew --no-configuration-cache jvmTest :cli:test
+        run: ./gradlew --no-configuration-cache jvmTest :cli:test :androidApp:testFossDebugUnitTest :androidApp:testPlayDebugUnitTest
 
       - name: Build CLI
         run: ./gradlew --no-configuration-cache :cli:installDist :cli:distZip
@@ -42,3 +43,9 @@ jobs:
           path: |
             androidApp/build/outputs/apk/**/*.apk
             cli/build/distributions/*.zip
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports
+          path: "**/build/reports/tests/"
