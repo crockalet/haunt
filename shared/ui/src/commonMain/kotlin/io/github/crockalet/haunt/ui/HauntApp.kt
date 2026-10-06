@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SizeTransform
@@ -33,11 +35,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.LocalHazePerformanceMode
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import io.github.crockalet.haunt.core.HauntController
 import io.github.crockalet.haunt.core.LatLng
+import io.github.crockalet.haunt.ui.components.GlassMode
 import io.github.crockalet.haunt.ui.components.GlassVeil
+import io.github.crockalet.haunt.ui.components.LocalGlassMode
 import io.github.crockalet.haunt.ui.components.LocalHazeState
 import io.github.crockalet.haunt.ui.components.LocalMorphScope
 import io.github.crockalet.haunt.ui.components.MorphScope
@@ -111,7 +117,8 @@ fun HauntApp(
 
         PlatformBackHandler(enabled = state.screen != Screen.Map || ui.expanded) { state.back() }
 
-        CompositionLocalProvider(LocalHazeState provides haze) {
+        // Blur at reduced resolution: indistinguishable at these radii, far cheaper while things move.
+        CompositionLocalProvider(LocalHazeState provides haze, LocalHazePerformanceMode provides HazePerformanceMode.Performance) {
             Box(modifier.fillMaxSize().background(colors.map)) {
                 HauntMap(
                     content = ui.map,
@@ -126,8 +133,17 @@ fun HauntApp(
                         OnboardingScreen(onboarding, onboardingActions)
                     }
                 } else {
-                    // Screens cross-fade and scale; elements marked with `morph` (search pill → search
-                    // field) spring from one screen's bounds to the other's.
+                    // Overlay screens sit on one blurred veil that only fades (never scale a blur: it is
+                    // re-captured every frame). Their content is plain tint, so it can cross-fade and
+                    // scale cheaply; elements marked with `morph` (search pill → search field) spring
+                    // from one screen's bounds to the other's.
+                    AnimatedVisibility(
+                        visible = state.screen != Screen.Map,
+                        enter = fadeIn(HauntMotion.smooth()),
+                        exit = fadeOut(HauntMotion.snappy()),
+                    ) {
+                        GlassVeil(Modifier.fillMaxSize()) {}
+                    }
                     SharedTransitionLayout(Modifier.fillMaxSize()) {
                         AnimatedContent(
                             targetState = state.screen,
@@ -138,7 +154,7 @@ fun HauntApp(
                                 if (screen == Screen.Map) {
                                     MapLayer(state, ui, data)
                                 } else {
-                                    GlassVeil(Modifier.fillMaxSize()) {
+                                    CompositionLocalProvider(LocalGlassMode provides GlassMode.Tint) {
                                         Sheet(screen, state, data, parseCoordinates, onThemeChange)
                                     }
                                 }
@@ -159,12 +175,17 @@ private fun HauntAppState.updateDefaults(data: HauntAppData, transform: (HauntDe
     data.onDefaultsChange(map.defaults)
 }
 
-/** Screen-to-screen motion: deeper screens grow in, going back shrinks them away. */
+/**
+ * Screen-to-screen motion: deeper screens grow in, going back shrinks them away. The map screen
+ * only fades: its chrome is blurred glass, which must not be scaled.
+ */
 private fun AnimatedContentTransitionScope<Screen>.screenTransition(from: Screen, to: Screen): ContentTransform {
     val forward = to.depth > from.depth
-    return (fadeIn(HauntMotion.smooth()) + scaleIn(HauntMotion.smooth(), initialScale = if (forward) 0.94f else 1.04f))
-        .togetherWith(fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = if (forward) 1.04f else 0.94f))
-        .using(SizeTransform(clip = false))
+    val enter = fadeIn(HauntMotion.smooth()) +
+        if (to == Screen.Map) EnterTransition.None else scaleIn(HauntMotion.smooth(), initialScale = if (forward) 0.94f else 1.04f)
+    val exit = fadeOut(HauntMotion.snappy()) +
+        if (from == Screen.Map) ExitTransition.None else scaleOut(HauntMotion.smooth(), targetScale = if (forward) 1.04f else 0.94f)
+    return enter.togetherWith(exit).using(SizeTransform(clip = false))
 }
 
 private val Screen.depth: Int

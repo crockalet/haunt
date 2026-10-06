@@ -49,6 +49,7 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
 | Map controls **collapsed by default** (floating toolbar + stop button, expandable card), no bottom nav | User wanted the map to dominate. |
 | Application ID `io.github.crockalet.haunt` is final | Confirmed by the user 2026-10-06; it can't change after publishing. |
 | Animations: Compose built-ins (shared bounds, `AnimatedContent`, springs), no library | Morphlet (user's reference) is React Native; Compose has the same primitives. |
+| Glass (blurred) surfaces are only faded or moved, never scaled or rotated; Haze runs in `Performance` mode; overlay screens share one veil that only fades | A scaled blur is re-captured and re-blurred every frame. The card's expand animation (scale + fade on a blurred card, plus the status chip scaling out) crashed on a real device (2026-10-06). |
 | Floating joystick via `SYSTEM_ALERT_WINDOW` overlay, opt-in | Joystick must work while another app is in front; only asked for when the user turns it on. |
 | Map style generated in code (`HauntMapStyle`) from the theme's map colours, not a hosted style | Real map matches the drawn one and the glass UI, follows light / dark, no style server to host; any OpenMapTiles TileJSON works. |
 | Fonts: Plus Jakarta Sans (UI), JetBrains Mono (data) | Bundled, OFL. |
