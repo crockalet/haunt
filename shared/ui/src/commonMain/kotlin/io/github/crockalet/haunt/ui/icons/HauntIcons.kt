@@ -45,6 +45,7 @@ object HauntIcons {
         "Move", 2f,
         "M12 3v18M3 12h18", "m9 6 3-3 3 3", "m9 18 3 3 3-3", "m6 9-3 3 3 3", "m18 9 3 3-3 3",
     )
+    val Locate = stroke("Locate", 2f, circle(12f, 12f, 7f), circle(12f, 12f, 2.5f), "M12 2v3M12 19v3M2 12h3M19 12h3")
     val Open = stroke("Open", 2.2f, "M7 17 17 7M9 7h8v8")
     val Play = fill("Play", "M7 5v14l11-7Z")
     val Stop = fill("Stop", rect(6f, 6f, 12f, 12f, 3f))

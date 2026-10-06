@@ -22,6 +22,7 @@ import io.github.crockalet.haunt.android.data.TracksStore
 import io.github.crockalet.haunt.android.inject.FlavourInjection
 import io.github.crockalet.haunt.android.inject.InjectionPipeline
 import io.github.crockalet.haunt.android.inject.InjectionStatus
+import io.github.crockalet.haunt.android.location.RealLocation
 import io.github.crockalet.haunt.android.net.Geocoder
 import io.github.crockalet.haunt.android.net.OsrmRouter
 import io.github.crockalet.haunt.android.net.PhotonGeocoder
@@ -160,6 +161,9 @@ class HauntRuntime internal constructor(context: Context) {
     private val http = UrlConnectionHttpClient(hauntUserAgent(appVersion))
 
     val geocoder: Geocoder = PhotonGeocoder(http) { settings.value.searchUrl }
+
+    /** The device's real position (locate button); see [RealLocation] for how it copes with faking. */
+    val realLocation = RealLocation(app, isFaking = { state.value !is HauntState.Idle })
 
     val router: Router = OsrmRouter(http, { settings.value.routingUrl }, { settings.value.routingProfile })
 

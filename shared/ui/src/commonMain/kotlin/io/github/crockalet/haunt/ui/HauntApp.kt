@@ -202,6 +202,7 @@ private fun MapLayer(state: HauntAppState, ui: MapUiState, data: HauntAppData) {
                 onJoystickMoved = { x, y -> state.updateDefaults(data) { it.copy(joystickOffsetX = x, joystickOffsetY = y) } },
             )
         }.copy(
+            onLocate = data.locateMe?.let { locateMe -> { holder.locate(locateMe) } },
             onCopyCoordinates = {
                 ui.map.fix?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
             },

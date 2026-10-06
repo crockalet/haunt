@@ -22,6 +22,8 @@ data class MapUiState(
     val route: RouteDetails?,
     val joystick: JoystickDetails?,
     val map: MapContent,
+    /** The locate button is waiting for a real fix. */
+    val locating: Boolean = false,
 )
 
 /** Content of the status chip under the search pill (collapsed state only). */
@@ -120,6 +122,8 @@ data class LocalUiState(
     val lastPosition: LatLng? = null,
     /** Camera target set by "Show on map"; cleared when something is haunted. */
     val cameraOverride: LatLng? = null,
+    /** The locate button is waiting for the device's real location. */
+    val locating: Boolean = false,
 )
 
 fun LocalUiState.presetSpeed(): Speed = speedPreset.speed ?: customSpeed
@@ -234,6 +238,7 @@ fun buildMapUiState(
         pin = pin,
         route = route,
         joystick = joystick,
+        locating = local.locating,
         map = MapContent(
             fix = position,
             accuracyMeters = fix?.accuracy,

@@ -33,6 +33,11 @@ data class HauntAppData(
     /** Settings → service editor saved: new URL and, for routing, profile (both trimmed and validated). */
     val onServiceSave: (ServiceKind, url: String, profile: String?) -> Unit = { _, _, _ -> },
     val onClearLog: () -> Unit = {},
+    /**
+     * The device's real location for the locate button; null hides the button. Throw
+     * [CommandException] (message + hint) when it can't be found.
+     */
+    val locateMe: (suspend () -> LatLng)? = null,
     /** Settings → Defaults changed (update rate, accuracy, units); persist them. */
     val onDefaultsChange: (HauntDefaults) -> Unit = {},
 ) {
@@ -115,6 +120,7 @@ object SampleData {
         adbControlEnabled = true,
         agentConnection = AgentConnection("haunt mcp", "via adb (USB) · since 14:01"),
         activityLog = log,
+        locateMe = { ShibuyaCrossing },
     )
 
     /**

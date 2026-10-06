@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import io.github.crockalet.haunt.android.data.TrackImport
+import io.github.crockalet.haunt.android.location.RealLocationException
 import io.github.crockalet.haunt.android.ui.AndroidCommands
 import io.github.crockalet.haunt.android.ui.OnboardingFlow
 import io.github.crockalet.haunt.android.ui.OnboardingInputs
@@ -38,6 +39,7 @@ import io.github.crockalet.haunt.ui.screens.LibraryTab
 import io.github.crockalet.haunt.ui.screens.OnboardingActions
 import io.github.crockalet.haunt.ui.screens.OnboardingStep
 import io.github.crockalet.haunt.ui.screens.OnboardingUiState
+import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.PlaceSearch
@@ -96,6 +98,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         runtime.setAppVisible(true)
+        // Keep a recent real fix around: once faking starts, it's the only "where am I" there is.
+        lifecycleScope.launch(Dispatchers.Default) { runtime.realLocation.lastKnown() }
         // Open the ADB socket while the app is visible so `haunt` connects instantly.
         if (runtime.settings.value.adbControlEnabled) runtime.startControlService()
     }
@@ -141,6 +145,12 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        // Opening Haunt while idle: start the map where you really are (cached fix, no waiting).
+        LaunchedEffect(Unit) {
+            if (state.map.local.lastPosition == null) {
+                withContext(Dispatchers.Default) { runtime.realLocation.lastKnown() }?.let { state.map.showOnMap(it.position) }
+            }
+        }
         LaunchedEffect(settings) {
             state.theme = UiMapping.theme(settings.theme)
             state.map.defaults = UiMapping.defaults(settings, state.map.defaults)
@@ -199,6 +209,13 @@ class MainActivity : ComponentActivity() {
             },
             onServiceSave = { kind, url, profile -> runtime.updateSettings { UiMapping.applyService(it, kind, url, profile) } },
             onClearLog = runtime.activityLog::clear,
+            locateMe = {
+                try {
+                    runtime.realLocation.current().position
+                } catch (e: RealLocationException) {
+                    throw CommandException(e.message ?: "Couldn't find your location", e.hint, e)
+                }
+            },
         )
 
         HauntApp(

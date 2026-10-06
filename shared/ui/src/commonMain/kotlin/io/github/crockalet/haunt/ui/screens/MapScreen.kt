@@ -3,6 +3,11 @@ package io.github.crockalet.haunt.ui.screens
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -39,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +57,7 @@ import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.ui.components.Chip
 import io.github.crockalet.haunt.ui.components.DetailsCard
 import io.github.crockalet.haunt.ui.components.Dot
+import io.github.crockalet.haunt.ui.components.GlassIconButton
 import io.github.crockalet.haunt.ui.components.GlassToolbar
 import io.github.crockalet.haunt.ui.components.IconButton
 import io.github.crockalet.haunt.ui.components.JoystickGrip
@@ -103,6 +110,8 @@ data class MapActions(
     val onFloatingJoystick: (Boolean) -> Unit = {},
     /** The pad was dragged to a new offset (dp from its default spot); persist it. */
     val onJoystickMoved: (xDp: Float, yDp: Float) -> Unit = { _, _ -> },
+    /** Locate button (real device location); null hides it. */
+    val onLocate: (() -> Unit)? = null,
 )
 
 /**
@@ -145,17 +154,26 @@ fun MapScreen(
         }
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 18.dp)) {
-            AnimatedVisibility(
-                state.joystick != null,
-                enter = fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.bouncy(), initialScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
-                exit = fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
-            ) {
-                // Keep showing the last pad while it animates out.
-                val last = remember { mutableStateOf(state.joystick) }
-                state.joystick?.let { last.value = it }
-                last.value?.let { j ->
-                    MovableJoystick(j, area, actions)
-                    Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                Column(Modifier.weight(1f)) {
+                    AnimatedVisibility(
+                        state.joystick != null,
+                        enter = fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.bouncy(), initialScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
+                        exit = fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
+                    ) {
+                        // Keep showing the last pad while it animates out.
+                        val last = remember { mutableStateOf(state.joystick) }
+                        state.joystick?.let { last.value = it }
+                        last.value?.let { j ->
+                            Column {
+                                MovableJoystick(j, area, actions)
+                                Spacer(Modifier.height(12.dp))
+                            }
+                        }
+                    }
+                }
+                actions.onLocate?.let { onLocate ->
+                    LocateButton(state.locating, onLocate, Modifier.padding(end = 12.dp, bottom = 12.dp))
                 }
             }
             AnimatedVisibility(
@@ -202,6 +220,20 @@ fun MapScreen(
             }
         }
     }
+}
+
+/** Round glass button: centre on / start from the device's real location. Spins while locating. */
+@Composable
+private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val spin = rememberInfiniteTransition(label = "locate")
+    val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "spin")
+    GlassIconButton(
+        icon = if (locating) HauntIcons.Spinner else HauntIcons.Locate,
+        contentDescription = if (locating) "Finding your location" else "Start from my location",
+        onClick = onClick,
+        modifier = modifier.graphicsLayer { rotationZ = if (locating) angle else 0f },
+        size = 52.dp,
+    )
 }
 
 /** Shared-element keys for [morph] transitions between screens. */
