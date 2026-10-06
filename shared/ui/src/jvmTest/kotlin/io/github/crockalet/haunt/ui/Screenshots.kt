@@ -152,7 +152,7 @@ class Screenshots {
 
     @Test
     fun settings() {
-        shot("09-settings", height = 1000) { App(it, holding, pinLocal, Screen.Settings) }
+        shot("09-settings", height = 1290) { App(it, holding, pinLocal, Screen.Settings) }
     }
 
     @Test

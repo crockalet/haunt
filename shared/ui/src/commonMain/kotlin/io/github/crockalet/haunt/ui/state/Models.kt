@@ -119,6 +119,14 @@ data class DetectedCoordinates(val position: LatLng, val format: String? = null,
 @Immutable
 data class Notice(val text: String, val hint: String? = null, val error: Boolean = true)
 
+/** Joystick pad sizes (diameter in dp); the knob scales with the pad. */
+enum class JoystickSize(val label: String, val dp: Float) {
+    Small("S", 112f),
+    Medium("M", 140f),
+    Large("L", 176f),
+    ExtraLarge("XL", 216f),
+}
+
 /** Default per-user settings shown in Settings → Defaults. */
 @Immutable
 data class HauntDefaults(
@@ -126,6 +134,12 @@ data class HauntDefaults(
     val accuracyMeters: Float = 5f,
     val metric: Boolean = true,
     val loop: LoopMode = LoopMode.Once,
+    val joystickSize: JoystickSize = JoystickSize.Medium,
+    /** Show the joystick over other apps while Haunt is in the background (Android). */
+    val floatingJoystick: Boolean = false,
+    /** Where the user dragged the in-app pad, in dp from its default spot (bottom-left). */
+    val joystickOffsetX: Float = 0f,
+    val joystickOffsetY: Float = 0f,
 )
 
 /** MapLibre style URLs; see https://openfreemap.org. */

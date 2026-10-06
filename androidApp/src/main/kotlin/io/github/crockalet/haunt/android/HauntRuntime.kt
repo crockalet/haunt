@@ -192,6 +192,15 @@ class HauntRuntime internal constructor(context: Context) {
 
     private val foregroundServices = MutableStateFlow(0)
 
+    private val _appVisible = MutableStateFlow(false)
+
+    /** Whether Haunt's own UI is on screen (MainActivity started); the floating joystick hides then. */
+    val appVisible: StateFlow<Boolean> = _appVisible.asStateFlow()
+
+    internal fun setAppVisible(visible: Boolean) {
+        _appVisible.value = visible
+    }
+
     init {
         // Live-apply accuracy/altitude defaults and the update rate.
         scope.launch {

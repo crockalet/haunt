@@ -33,6 +33,16 @@ data class HauntSettings(
     val routingProfile: String = DEFAULT_ROUTING_PROFILE,
     /** MapLibre style URL for the map (used by the UI). */
     val mapStyleUrl: String = DEFAULT_MAP_STYLE_URL,
+    /** Joystick pad size: a `JoystickSize` name from the shared UI (S / M / L / XL). */
+    val joystickSize: String = DEFAULT_JOYSTICK_SIZE,
+    /** Show the joystick over other apps while joystick mode runs and Haunt is in the background. */
+    val floatingJoystick: Boolean = false,
+    /** In-app pad offset from its default spot (dp). */
+    val joystickOffsetX: Float = 0f,
+    val joystickOffsetY: Float = 0f,
+    /** Floating pad position as a fraction (0..1) of the screen's free width / height; null = default spot. */
+    val overlayX: Float? = null,
+    val overlayY: Float? = null,
 ) {
     val defaults: HauntDefaults get() = HauntDefaults(accuracy = accuracyMeters, altitude = altitudeMeters)
 
@@ -41,6 +51,7 @@ data class HauntSettings(
         const val DEFAULT_ROUTING_URL = "https://router.project-osrm.org"
         const val DEFAULT_ROUTING_PROFILE = "driving"
         const val DEFAULT_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+        const val DEFAULT_JOYSTICK_SIZE = "Medium"
         const val MIN_UPDATE_INTERVAL_MILLIS = 100L
         const val MAX_UPDATE_INTERVAL_MILLIS = 10_000L
     }
@@ -59,6 +70,13 @@ object SettingsKeys {
     const val ROUTING_URL = "routing_url"
     const val ROUTING_PROFILE = "routing_profile"
     const val MAP_STYLE_URL = "map_style_url"
+    const val JOYSTICK_SIZE = "joystick_size"
+    const val FLOATING_JOYSTICK = "floating_joystick"
+    const val JOYSTICK_OFFSET_X = "joystick_offset_x_dp"
+    const val JOYSTICK_OFFSET_Y = "joystick_offset_y_dp"
+    /** Stored as strings so "not placed yet" is representable. */
+    const val OVERLAY_X = "overlay_x"
+    const val OVERLAY_Y = "overlay_y"
 
     /** Reads settings, falling back to defaults for missing or invalid values. */
     fun read(store: KeyValueStore): HauntSettings {
@@ -75,6 +93,12 @@ object SettingsKeys {
             routingUrl = store.getString(ROUTING_URL)?.trim()?.takeIf { it.isNotEmpty() } ?: d.routingUrl,
             routingProfile = store.getString(ROUTING_PROFILE)?.trim()?.takeIf { it.isNotEmpty() } ?: d.routingProfile,
             mapStyleUrl = store.getString(MAP_STYLE_URL)?.trim()?.takeIf { it.isNotEmpty() } ?: d.mapStyleUrl,
+            joystickSize = store.getString(JOYSTICK_SIZE)?.trim()?.takeIf { it.isNotEmpty() } ?: d.joystickSize,
+            floatingJoystick = store.getBoolean(FLOATING_JOYSTICK, d.floatingJoystick),
+            joystickOffsetX = store.getFloat(JOYSTICK_OFFSET_X, d.joystickOffsetX).takeIf { it.isFinite() } ?: d.joystickOffsetX,
+            joystickOffsetY = store.getFloat(JOYSTICK_OFFSET_Y, d.joystickOffsetY).takeIf { it.isFinite() } ?: d.joystickOffsetY,
+            overlayX = fraction(store.getString(OVERLAY_X)),
+            overlayY = fraction(store.getString(OVERLAY_Y)),
         )
     }
 
@@ -90,7 +114,15 @@ object SettingsKeys {
         ROUTING_URL to settings.routingUrl,
         ROUTING_PROFILE to settings.routingProfile,
         MAP_STYLE_URL to settings.mapStyleUrl,
+        JOYSTICK_SIZE to settings.joystickSize,
+        FLOATING_JOYSTICK to settings.floatingJoystick,
+        JOYSTICK_OFFSET_X to settings.joystickOffsetX,
+        JOYSTICK_OFFSET_Y to settings.joystickOffsetY,
+        OVERLAY_X to settings.overlayX?.toString(),
+        OVERLAY_Y to settings.overlayY?.toString(),
     )
+
+    private fun fraction(s: String?): Float? = s?.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
 
     private inline fun <reified E : Enum<E>> enumOrDefault(name: String?, default: E): E =
         enumValues<E>().firstOrNull { it.name.equals(name, ignoreCase = true) } ?: default

@@ -1,10 +1,17 @@
 package io.github.crockalet.haunt.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,18 +22,30 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.ui.components.Chip
@@ -34,6 +53,7 @@ import io.github.crockalet.haunt.ui.components.DetailsCard
 import io.github.crockalet.haunt.ui.components.Dot
 import io.github.crockalet.haunt.ui.components.GlassToolbar
 import io.github.crockalet.haunt.ui.components.IconButton
+import io.github.crockalet.haunt.ui.components.JoystickGrip
 import io.github.crockalet.haunt.ui.components.JoystickPad
 import io.github.crockalet.haunt.ui.components.ProgressBar
 import io.github.crockalet.haunt.ui.components.SearchPill
@@ -46,8 +66,10 @@ import io.github.crockalet.haunt.ui.components.Switch
 import io.github.crockalet.haunt.ui.components.Text
 import io.github.crockalet.haunt.ui.components.ToolbarButton
 import io.github.crockalet.haunt.ui.components.VerticalHairline
+import io.github.crockalet.haunt.ui.components.morph
 import io.github.crockalet.haunt.ui.icons.HauntIcons
 import io.github.crockalet.haunt.ui.state.JoystickDetails
+import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.MapUiState
@@ -55,6 +77,7 @@ import io.github.crockalet.haunt.ui.state.PinDetails
 import io.github.crockalet.haunt.ui.state.RouteDetails
 import io.github.crockalet.haunt.ui.state.SpeedPreset
 import io.github.crockalet.haunt.ui.state.StatusUi
+import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 
 /** Callbacks of the map screen. All default to no-ops (previews). */
@@ -76,6 +99,10 @@ data class MapActions(
     val onCustomSpeed: (Float) -> Unit = {},
     val onJoystick: (bearingDeg: Double, magnitude: Double) -> Unit = { _, _ -> },
     val onJoystickMaxSpeed: (Float) -> Unit = {},
+    val onJoystickSize: (JoystickSize) -> Unit = {},
+    val onFloatingJoystick: (Boolean) -> Unit = {},
+    /** The pad was dragged to a new offset (dp from its default spot); persist it. */
+    val onJoystickMoved: (xDp: Float, yDp: Float) -> Unit = { _, _ -> },
 )
 
 /**
@@ -88,7 +115,13 @@ fun MapScreen(
     actions: MapActions,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+    var area by remember { mutableStateOf(Rect.Zero) }
+    Box(
+        modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .onGloballyPositioned { area = it.boundsInRoot() },
+    ) {
         Column(
             Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -100,32 +133,58 @@ fun MapScreen(
                 onClick = actions.onSearch,
                 onLibrary = actions.onLibrary,
                 onSettings = actions.onSettings,
+                modifier = Modifier.morph(MorphKeys.Search),
             )
-            AnimatedVisibility(!state.expanded, enter = fadeIn(), exit = fadeOut()) {
+            AnimatedVisibility(
+                !state.expanded,
+                enter = fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.smooth(), initialScale = 0.9f),
+                exit = fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = 0.9f),
+            ) {
                 Status(state.status)
             }
         }
 
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 18.dp)) {
-            state.joystick?.let { j ->
-                JoystickPad(
-                    bearingDeg = j.bearingDeg,
-                    magnitude = j.magnitude,
-                    onInput = actions.onJoystick,
-                    modifier = Modifier.padding(start = 20.dp),
-                )
-                Spacer(Modifier.height(24.dp))
+            AnimatedVisibility(
+                state.joystick != null,
+                enter = fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.bouncy(), initialScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
+                exit = fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
+            ) {
+                // Keep showing the last pad while it animates out.
+                val last = remember { mutableStateOf(state.joystick) }
+                state.joystick?.let { last.value = it }
+                last.value?.let { j ->
+                    MovableJoystick(j, area, actions)
+                    Spacer(Modifier.height(12.dp))
+                }
             }
             AnimatedVisibility(
                 state.expanded,
-                enter = fadeIn() + slideInVertically { it / 4 },
-                exit = fadeOut() + slideOutVertically { it / 4 },
+                // The card grows out of the toolbar, like a tray morphing from its trigger.
+                enter = fadeIn(HauntMotion.snappy()) +
+                    expandVertically(HauntMotion.smooth(), expandFrom = Alignment.Bottom) +
+                    scaleIn(HauntMotion.smooth(), initialScale = 0.85f, transformOrigin = TransformOrigin(0.5f, 1f)),
+                exit = fadeOut(HauntMotion.snappy()) +
+                    shrinkVertically(HauntMotion.smooth(), shrinkTowards = Alignment.Bottom) +
+                    scaleOut(HauntMotion.smooth(), targetScale = 0.85f, transformOrigin = TransformOrigin(0.5f, 1f)),
             ) {
                 Box(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 16.dp)) {
-                    when {
-                        state.pin != null -> PinCard(state.pin, actions)
-                        state.route != null -> RouteCard(state.route, actions)
-                        state.joystick != null -> JoystickCard(state.joystick, actions)
+                    // Switching mode morphs the card between its contents and springs to the new size.
+                    AnimatedContent(
+                        targetState = state,
+                        contentKey = { it.mode },
+                        transitionSpec = {
+                            (fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.smooth(), initialScale = 0.96f))
+                                .togetherWith(fadeOut(HauntMotion.snappy()))
+                                .using(SizeTransform(clip = false) { _, _ -> HauntMotion.smooth() })
+                        },
+                        label = "card",
+                    ) { s ->
+                        when {
+                            s.pin != null -> PinCard(s.pin, actions)
+                            s.route != null -> RouteCard(s.route, actions)
+                            s.joystick != null -> JoystickCard(s.joystick, actions)
+                        }
                     }
                 }
             }
@@ -145,8 +204,74 @@ fun MapScreen(
     }
 }
 
+/** Shared-element keys for [morph] transitions between screens. */
+object MorphKeys {
+    const val Search = "search"
+}
+
+/**
+ * The joystick pad at its default spot (bottom-left) shifted by the user's offset. Drag the grip
+ * on its corner to move it; it stays inside [area] (the screen's safe area, in root px).
+ */
+@Composable
+private fun MovableJoystick(j: JoystickDetails, area: Rect, actions: MapActions) {
+    val density = LocalDensity.current
+    val stored = Offset(j.offsetX, j.offsetY)
+    var live by remember { mutableStateOf<Offset?>(null) }
+    var base by remember { mutableStateOf(Rect.Zero) }
+    val offset = live ?: stored
+    val padSize = j.size.dp.dp
+
+    fun clamp(o: Offset): Offset {
+        if (area == Rect.Zero || base == Rect.Zero) return o
+        with(density) {
+            val minX = (area.left - base.left).toDp().value
+            val maxX = (area.right - base.right).toDp().value
+            val minY = (area.top - base.top).toDp().value
+            val maxY = (area.bottom - base.bottom).toDp().value
+            return Offset(o.x.coerceIn(minX, maxOf(minX, maxX)), o.y.coerceIn(minY, maxOf(minY, maxY)))
+        }
+    }
+
+    Box(
+        Modifier
+            .padding(start = 14.dp)
+            .onGloballyPositioned { base = it.boundsInRoot() }
+            .offset { IntOffset(offset.x.dp.roundToPx(), offset.y.dp.roundToPx()) },
+    ) {
+        JoystickPad(
+            bearingDeg = j.bearingDeg,
+            magnitude = j.magnitude,
+            onInput = actions.onJoystick,
+            padSize = padSize,
+            modifier = Modifier.padding(top = 12.dp, end = 12.dp),
+        )
+        JoystickGrip(
+            onDrag = { d -> live = clamp((live ?: stored) + Offset(d.x / density.density, d.y / density.density)) },
+            onDragEnd = {
+                live?.let { actions.onJoystickMoved(it.x, it.y) }
+                live = null
+            },
+            modifier = Modifier.align(Alignment.TopEnd),
+        )
+    }
+}
+
 @Composable
 private fun Status(status: StatusUi) {
+    AnimatedContent(
+        targetState = status,
+        contentKey = { it::class },
+        transitionSpec = {
+            fadeIn(HauntMotion.snappy()).togetherWith(fadeOut(HauntMotion.snappy()))
+                .using(SizeTransform(clip = false) { _, _ -> HauntMotion.smooth() })
+        },
+        label = "status",
+    ) { s -> StatusContent(s) }
+}
+
+@Composable
+private fun StatusContent(status: StatusUi) {
     val c = HauntTheme.colors
     when (status) {
         is StatusUi.Message -> StatusChip {
@@ -291,6 +416,22 @@ private fun JoystickCard(j: JoystickDetails, actions: MapActions) {
                 Text("Walk · Cycle · Drive", style = HauntTheme.type.small, color = c.muted)
             }
             Slider(j.maxSpeedKmh, actions.onJoystickMaxSpeed, valueRange = 1f..120f, contentDescription = "Max speed")
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Pad size", style = HauntTheme.type.bodyStrong)
+            SegmentedControl(
+                options = JoystickSize.entries,
+                selected = j.size,
+                onSelect = actions.onJoystickSize,
+                label = { it.label },
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Float over other apps", style = HauntTheme.type.bodyStrong)
+                Text("Keep steering after you leave Haunt", style = HauntTheme.type.small, color = c.muted)
+            }
+            Switch(j.floating, actions.onFloatingJoystick, contentDescription = "Float over other apps")
         }
     }
 }

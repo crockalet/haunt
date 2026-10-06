@@ -70,6 +70,11 @@ data class JoystickDetails(
     val directionLabel: String,
     val bearingDeg: Double,
     val magnitude: Double,
+    val size: JoystickSize = JoystickSize.Medium,
+    val floating: Boolean = false,
+    /** Pad offset from its default spot, in dp. */
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
 )
 
 /** What the map layer shows. */
@@ -192,6 +197,10 @@ fun buildMapUiState(
             directionLabel = Format.compass(heading),
             bearingDeg = local.joystickBearing,
             magnitude = local.joystickMagnitude,
+            size = defaults.joystickSize,
+            floating = defaults.floatingJoystick,
+            offsetX = defaults.joystickOffsetX,
+            offsetY = defaults.joystickOffsetY,
         )
     } else null
 

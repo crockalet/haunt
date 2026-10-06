@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import io.github.crockalet.haunt.android.overlay.JoystickOverlay
 import io.github.crockalet.haunt.core.HauntState
 import io.github.crockalet.haunt.protocol.RpcException
 import kotlinx.coroutines.CoroutineScope
@@ -22,16 +23,19 @@ import kotlinx.coroutines.launch
  * Fixes are pushed to the platform by the runtime's [io.github.crockalet.haunt.android.inject.InjectionPipeline]
  * (started the moment mocking starts), so injection never waits for, or depends on, this service.
  * Started by [HauntRuntime.startMockingService] (automatically whenever the state leaves Idle).
+ * It also hosts the floating joystick ([JoystickOverlay]) while joystick mode runs in the background.
  */
 class HauntService : Service() {
     private lateinit var runtime: HauntRuntime
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var watchJob: Job? = null
     private var foreground = false
+    private lateinit var overlay: JoystickOverlay
 
     override fun onCreate() {
         super.onCreate()
         runtime = HauntRuntime.from(this)
+        overlay = JoystickOverlay(this, runtime)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -49,6 +53,7 @@ class HauntService : Service() {
             shutdown()
             return START_NOT_STICKY
         }
+        overlay.start(scope)
         if (watchJob == null) {
             watchJob = scope.launch {
                 runtime.state.first { it == HauntState.Idle }
@@ -75,6 +80,7 @@ class HauntService : Service() {
     }
 
     private fun shutdown() {
+        overlay.stop()
         if (foreground) {
             foreground = false
             runtime.onServiceForeground(false)
@@ -84,6 +90,7 @@ class HauntService : Service() {
     }
 
     override fun onDestroy() {
+        overlay.stop()
         if (foreground) {
             foreground = false
             runtime.onServiceForeground(false)

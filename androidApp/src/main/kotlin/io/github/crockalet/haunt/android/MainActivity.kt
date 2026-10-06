@@ -95,8 +95,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        runtime.setAppVisible(true)
         // Open the ADB socket while the app is visible so `haunt` connects instantly.
         if (runtime.settings.value.adbControlEnabled) runtime.startControlService()
+    }
+
+    override fun onStop() {
+        // Leaving Haunt: the floating joystick takes over if it's on.
+        runtime.setAppVisible(false)
+        super.onStop()
     }
 
     override fun onResume() {
@@ -185,7 +192,11 @@ class MainActivity : ComponentActivity() {
             services = remember(settings) { UiMapping.services(settings) },
             onImportTrack = { importLauncher.launch(arrayOf("*/*")) },
             onSaveFavourite = { place -> saveFavourite(place.name, place.position) },
-            onDefaultsChange = { d -> runtime.updateSettings { UiMapping.applyDefaults(it, d) } },
+            onDefaultsChange = { d ->
+                val before = runtime.settings.value
+                runtime.updateSettings { UiMapping.applyDefaults(it, d) }
+                if (d.floatingJoystick && !before.floatingJoystick && !Settings.canDrawOverlays(this)) requestOverlayPermission()
+            },
             onServiceSave = { kind, url, profile -> runtime.updateSettings { UiMapping.applyService(it, kind, url, profile) } },
             onClearLog = runtime.activityLog::clear,
         )
@@ -268,6 +279,18 @@ class MainActivity : ComponentActivity() {
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) prefs.edit { putBoolean(KEY_NOTIFICATIONS_ASKED, true) }
         permissionLauncher.launch(permissions.toTypedArray())
+    }
+
+    /** "Display over other apps" for Haunt; the floating joystick appears once it's allowed. */
+    private fun requestOverlayPermission() {
+        lifecycleScope.launch {
+            uiEvents.send(
+                UiEvent.Show(
+                    Notice("Allow “Display over other apps” for Haunt", "Then the joystick floats over other apps in joystick mode.", error = false),
+                ),
+            )
+        }
+        openSettings(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.fromParts("package", packageName, null))
     }
 
     private fun openSettings(action: String, data: Uri? = null) {

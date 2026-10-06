@@ -14,6 +14,7 @@ import io.github.crockalet.haunt.ui.state.AgentConnection
 import io.github.crockalet.haunt.ui.state.Folder
 import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.LogEntry
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.Place
@@ -195,11 +196,22 @@ object UiMapping {
         updateRateHz = (1000L / s.updateIntervalMillis.coerceAtLeast(1)).toInt().coerceAtLeast(1),
         accuracyMeters = s.accuracyMeters,
         metric = s.units == Units.Metric,
+        joystickSize = joystickSize(s),
+        floatingJoystick = s.floatingJoystick,
+        joystickOffsetX = s.joystickOffsetX,
+        joystickOffsetY = s.joystickOffsetY,
     )
 
     fun applyDefaults(s: HauntSettings, d: HauntDefaults): HauntSettings = s.copy(
         updateIntervalMillis = 1000L / d.updateRateHz.coerceAtLeast(1),
         accuracyMeters = d.accuracyMeters,
         units = if (d.metric) Units.Metric else Units.Imperial,
+        joystickSize = d.joystickSize.name,
+        floatingJoystick = d.floatingJoystick,
+        joystickOffsetX = d.joystickOffsetX,
+        joystickOffsetY = d.joystickOffsetY,
     )
+
+    fun joystickSize(s: HauntSettings): JoystickSize =
+        JoystickSize.entries.firstOrNull { it.name.equals(s.joystickSize, ignoreCase = true) } ?: JoystickSize.Medium
 }

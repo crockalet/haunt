@@ -41,6 +41,11 @@ object HauntIcons {
     val Terminal = stroke("Terminal", 2.2f, "m5 8 4 4-4 4M12 16h7")
     val Check = stroke("Check", 2.6f, "m5 12 5 5 9-10")
     val Spinner = stroke("Spinner", 3f, "M21 12a9 9 0 1 1-9-9")
+    val Move = stroke(
+        "Move", 2f,
+        "M12 3v18M3 12h18", "m9 6 3-3 3 3", "m9 18 3 3 3-3", "m6 9-3 3 3 3", "m18 9 3 3-3 3",
+    )
+    val Open = stroke("Open", 2.2f, "M7 17 17 7M9 7h8v8")
     val Play = fill("Play", "M7 5v14l11-7Z")
     val Stop = fill("Stop", rect(6f, 6f, 12f, 12f, 3f))
 

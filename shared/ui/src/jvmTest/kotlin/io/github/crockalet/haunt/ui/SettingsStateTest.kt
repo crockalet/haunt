@@ -3,9 +3,14 @@ package io.github.crockalet.haunt.ui
 import io.github.crockalet.haunt.core.HauntState
 import io.github.crockalet.haunt.ui.state.FakeHauntController
 import io.github.crockalet.haunt.ui.state.HauntAppData
+import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.LocalUiState
+import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.ServiceEndpoint
 import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.state.ServiceValidation
+import io.github.crockalet.haunt.ui.state.buildMapUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -97,5 +102,24 @@ class SettingsNavigationTest {
         var profile: String? = "unset"
         assertTrue(s.saveService { _, _, p -> profile = p })
         assertNull(profile)
+    }
+}
+
+class JoystickDefaultsTest {
+    @Test
+    fun padSettingsReachTheJoystickDetails() {
+        val defaults = HauntDefaults(
+            joystickSize = JoystickSize.Large,
+            floatingJoystick = true,
+            joystickOffsetX = 30f,
+            joystickOffsetY = -120f,
+        )
+        val local = LocalUiState(mode = MapMode.Joystick)
+        val j = assertNotNull(buildMapUiState(HauntState.Idle, local, defaults).joystick)
+        assertEquals(JoystickSize.Large, j.size)
+        assertTrue(j.floating)
+        assertEquals(30f, j.offsetX)
+        assertEquals(-120f, j.offsetY)
+        assertNull(buildMapUiState(HauntState.Idle, local.copy(mode = MapMode.Pin), defaults).joystick)
     }
 }

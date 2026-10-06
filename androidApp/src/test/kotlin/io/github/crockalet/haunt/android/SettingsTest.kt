@@ -32,6 +32,12 @@ class SettingsTest {
             routingUrl = "https://osrm.example.org",
             routingProfile = "foot",
             mapStyleUrl = "https://tiles.example.org/style.json",
+            joystickSize = "Large",
+            floatingJoystick = true,
+            joystickOffsetX = 24f,
+            joystickOffsetY = -180f,
+            overlayX = 0.25f,
+            overlayY = 1f,
         )
         val store = InMemoryKeyValueStore(SettingsKeys.entries(settings))
         assertEquals(settings, SettingsKeys.read(store))
@@ -48,6 +54,9 @@ class SettingsTest {
                 SettingsKeys.UNITS to "furlongs",
                 SettingsKeys.THEME to "dark",
                 SettingsKeys.SEARCH_URL to "  ",
+                SettingsKeys.OVERLAY_X to "1.7",
+                SettingsKeys.OVERLAY_Y to "nope",
+                SettingsKeys.JOYSTICK_OFFSET_X to Float.NaN,
             ),
         )
         val s = SettingsKeys.read(store)
@@ -57,6 +66,9 @@ class SettingsTest {
         assertEquals(Units.Metric, s.units)
         assertEquals(ThemeMode.Dark, s.theme) // case-insensitive
         assertEquals(HauntSettings.DEFAULT_SEARCH_URL, s.searchUrl)
+        assertEquals(1f, s.overlayX) // clamped to the screen
+        assertNull(s.overlayY)
+        assertEquals(0f, s.joystickOffsetX)
     }
 
     @Test

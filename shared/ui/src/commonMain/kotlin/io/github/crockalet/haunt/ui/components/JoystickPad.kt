@@ -1,5 +1,7 @@
 package io.github.crockalet.haunt.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,9 +27,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import io.github.crockalet.haunt.ui.icons.HauntIcons
+import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntShapes
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 import kotlin.math.PI
@@ -57,8 +63,9 @@ object JoystickMath {
 }
 
 /**
- * Glass thumbstick (140dp). Drag the accent knob; [onInput] receives bearing (0 = north) and
- * magnitude (0..1). On release the knob springs back and [onInput] gets magnitude 0.
+ * Glass thumbstick ([padSize] across, knob 40% of it). Drag the accent knob; [onInput] receives
+ * bearing (0 = north) and magnitude (0..1). On release the knob springs back and [onInput] gets
+ * magnitude 0.
  *
  * When not dragging, the knob shows [bearingDeg]/[magnitude] (hoisted state).
  */
@@ -68,16 +75,26 @@ fun JoystickPad(
     magnitude: Double,
     onInput: (bearingDeg: Double, magnitude: Double) -> Unit,
     modifier: Modifier = Modifier,
+    padSize: Dp = 140.dp,
 ) {
     val c = HauntTheme.colors
     val density = LocalDensity.current
-    val padSize = 140.dp
-    val knobSize = 56.dp
+    val knobSize = padSize * 0.4f
     val maxTravel = with(density) { ((padSize - knobSize) / 2).toPx() }
     val input by rememberUpdatedState(onInput)
     val lastBearing by rememberUpdatedState(bearingDeg)
     var drag by remember { mutableStateOf<Offset?>(null) }
-    val knob = drag ?: JoystickMath.toOffset(bearingDeg, magnitude, maxTravel)
+    // Follows the finger exactly while dragging; springs back to the hoisted position on release.
+    val rest = JoystickMath.toOffset(bearingDeg, magnitude, maxTravel)
+    val spring = remember { Animatable(rest, Offset.VectorConverter) }
+    var released by remember { mutableStateOf<Offset?>(null) }
+    LaunchedEffect(drag == null, rest) {
+        if (drag != null) return@LaunchedEffect
+        released?.let { spring.snapTo(it) }
+        released = null
+        spring.animateTo(rest, HauntMotion.bouncy())
+    }
+    val knob = drag ?: spring.value
 
     GlassSurface(
         modifier
@@ -96,10 +113,12 @@ fun JoystickPad(
                 detectDragGestures(
                     onDragStart = { emit(it) },
                     onDragEnd = {
+                        released = drag
                         drag = null
                         input(lastBearing, 0.0)
                     },
                     onDragCancel = {
+                        released = drag
                         drag = null
                         input(lastBearing, 0.0)
                     },
@@ -108,10 +127,11 @@ fun JoystickPad(
             },
         shape = HauntShapes.pill,
     ) {
-        Tick(Modifier.align(Alignment.TopCenter).padding(top = 10.dp), horizontal = false)
-        Tick(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp), horizontal = false)
-        Tick(Modifier.align(Alignment.CenterStart).padding(start = 10.dp), horizontal = true)
-        Tick(Modifier.align(Alignment.CenterEnd).padding(end = 10.dp), horizontal = true)
+        val tickInset = padSize * 0.07f
+        Tick(Modifier.align(Alignment.TopCenter).padding(top = tickInset), horizontal = false)
+        Tick(Modifier.align(Alignment.BottomCenter).padding(bottom = tickInset), horizontal = false)
+        Tick(Modifier.align(Alignment.CenterStart).padding(start = tickInset), horizontal = true)
+        Tick(Modifier.align(Alignment.CenterEnd).padding(end = tickInset), horizontal = true)
         Box(
             Modifier
                 .align(Alignment.Center)
@@ -122,5 +142,45 @@ fun JoystickPad(
                 .background(c.accent)
                 .border(3.dp, Color.White, HauntShapes.pill),
         )
+    }
+}
+
+/**
+ * Small round glass handle that sits on the joystick's corner; dragging it moves the pad.
+ * [onDrag] gets the drag delta in px; [onDragEnd] fires once the finger lifts (persist the position then).
+ *
+ * @param gestures replaces the built-in drag handling (the floating pad moves its whole window and
+ *   needs screen coordinates instead).
+ */
+@Composable
+fun JoystickGrip(
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 34.dp,
+    gestures: Modifier? = null,
+) {
+    val drag by rememberUpdatedState(onDrag)
+    val end by rememberUpdatedState(onDragEnd)
+    GlassSurface(
+        modifier
+            .size(size)
+            .semantics { contentDescription = "Move joystick" }
+            .then(
+                gestures ?: Modifier.pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragEnd = { end() },
+                        onDragCancel = { end() },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            drag(amount)
+                        },
+                    )
+                },
+            ),
+        shape = HauntShapes.pill,
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(HauntIcons.Move, null, size = size * 0.5f, tint = HauntTheme.colors.text)
     }
 }

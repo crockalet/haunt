@@ -51,6 +51,7 @@ dependencies {
     implementation(project(":shared:protocol"))
     implementation(project(":shared:ui"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.compose.foundation) // floating joystick window
     implementation(libs.kotlinx.coroutines.android)
     "playImplementation"(libs.play.services.location)
     implementation(libs.kotlinx.serialization.json)
