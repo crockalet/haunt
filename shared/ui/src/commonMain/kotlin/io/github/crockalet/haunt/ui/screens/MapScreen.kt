@@ -11,11 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -124,12 +119,13 @@ fun MapScreen(
     actions: MapActions,
     modifier: Modifier = Modifier,
 ) {
-    var area by remember { mutableStateOf(Rect.Zero) }
+    // Only read while dragging the pad, so not state: layout passes (e.g. the card expanding) mustn't recompose.
+    val area = remember { Bounds() }
     Box(
         modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .onGloballyPositioned { area = it.boundsInRoot() },
+            .onGloballyPositioned { area.rect = it.boundsInRoot() },
     ) {
         Column(
             Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp),
@@ -144,10 +140,12 @@ fun MapScreen(
                 onSettings = actions.onSettings,
                 modifier = Modifier.morph(MorphKeys.Search),
             )
+            // Glass is a live blur of the map: fade or move it, never scale it (a scaled blur is
+            // re-captured and re-blurred at every frame of the animation).
             AnimatedVisibility(
                 !state.expanded,
-                enter = fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.smooth(), initialScale = 0.9f),
-                exit = fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = 0.9f),
+                enter = fadeIn(HauntMotion.snappy()),
+                exit = fadeOut(HauntMotion.snappy()),
             ) {
                 Status(state.status)
             }
@@ -158,8 +156,8 @@ fun MapScreen(
                 Column(Modifier.weight(1f)) {
                     AnimatedVisibility(
                         state.joystick != null,
-                        enter = fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.bouncy(), initialScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
-                        exit = fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = 0.6f, transformOrigin = TransformOrigin(0f, 1f)),
+                        enter = fadeIn(HauntMotion.snappy()),
+                        exit = fadeOut(HauntMotion.snappy()),
                     ) {
                         // Keep showing the last pad while it animates out.
                         val last = remember { mutableStateOf(state.joystick) }
@@ -178,13 +176,10 @@ fun MapScreen(
             }
             AnimatedVisibility(
                 state.expanded,
-                // The card grows out of the toolbar, like a tray morphing from its trigger.
-                enter = fadeIn(HauntMotion.snappy()) +
-                    expandVertically(HauntMotion.smooth(), expandFrom = Alignment.Bottom) +
-                    scaleIn(HauntMotion.smooth(), initialScale = 0.85f, transformOrigin = TransformOrigin(0.5f, 1f)),
-                exit = fadeOut(HauntMotion.snappy()) +
-                    shrinkVertically(HauntMotion.smooth(), shrinkTowards = Alignment.Bottom) +
-                    scaleOut(HauntMotion.smooth(), targetScale = 0.85f, transformOrigin = TransformOrigin(0.5f, 1f)),
+                // The card is revealed upwards out of the toolbar: a clip grows over it while it stays put
+                // on screen, so its blurred backdrop is captured once rather than every frame.
+                enter = fadeIn(HauntMotion.snappy()) + expandVertically(HauntMotion.smooth(), expandFrom = Alignment.Bottom),
+                exit = fadeOut(HauntMotion.snappy()) + shrinkVertically(HauntMotion.smooth(), shrinkTowards = Alignment.Bottom),
             ) {
                 Box(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 16.dp)) {
                     // Switching mode morphs the card between its contents and springs to the new size.
@@ -192,7 +187,7 @@ fun MapScreen(
                         targetState = state,
                         contentKey = { it.mode },
                         transitionSpec = {
-                            (fadeIn(HauntMotion.snappy()) + scaleIn(HauntMotion.smooth(), initialScale = 0.96f))
+                            fadeIn(HauntMotion.snappy())
                                 .togetherWith(fadeOut(HauntMotion.snappy()))
                                 .using(SizeTransform(clip = false) { _, _ -> HauntMotion.smooth() })
                         },
@@ -231,9 +226,16 @@ private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modif
         icon = if (locating) HauntIcons.Spinner else HauntIcons.Locate,
         contentDescription = if (locating) "Finding your location" else "Start from my location",
         onClick = onClick,
-        modifier = modifier.graphicsLayer { rotationZ = if (locating) angle else 0f },
+        modifier = modifier,
         size = 52.dp,
+        // Spin the icon only; rotating the glass would re-blur it every frame.
+        iconModifier = Modifier.graphicsLayer { rotationZ = if (locating) angle else 0f },
     )
+}
+
+/** Layout bounds kept outside snapshot state: written on every layout pass, read only in gestures. */
+private class Bounds {
+    var rect: Rect = Rect.Zero
 }
 
 /** Shared-element keys for [morph] transitions between screens. */
@@ -246,15 +248,17 @@ object MorphKeys {
  * on its corner to move it; it stays inside [area] (the screen's safe area, in root px).
  */
 @Composable
-private fun MovableJoystick(j: JoystickDetails, area: Rect, actions: MapActions) {
+private fun MovableJoystick(j: JoystickDetails, areaBounds: Bounds, actions: MapActions) {
     val density = LocalDensity.current
     val stored = Offset(j.offsetX, j.offsetY)
     var live by remember { mutableStateOf<Offset?>(null) }
-    var base by remember { mutableStateOf(Rect.Zero) }
+    val baseBounds = remember { Bounds() }
     val offset = live ?: stored
     val padSize = j.size.dp.dp
 
     fun clamp(o: Offset): Offset {
+        val area = areaBounds.rect
+        val base = baseBounds.rect
         if (area == Rect.Zero || base == Rect.Zero) return o
         with(density) {
             val minX = (area.left - base.left).toDp().value
@@ -268,7 +272,7 @@ private fun MovableJoystick(j: JoystickDetails, area: Rect, actions: MapActions)
     Box(
         Modifier
             .padding(start = 14.dp)
-            .onGloballyPositioned { base = it.boundsInRoot() }
+            .onGloballyPositioned { baseBounds.rect = it.boundsInRoot() }
             .offset { IntOffset(offset.x.dp.roundToPx(), offset.y.dp.roundToPx()) },
     ) {
         JoystickPad(

@@ -223,18 +223,21 @@ fun GlassButton(
     height: Dp = 40.dp,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    // Press feedback scales the label, not the glass: a scaled blur is re-rendered every frame.
     GlassSurface(
         modifier
-            .pressScale(interaction)
             .height(height)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, Modifier.padding(horizontal = 16.dp), style = HauntTheme.type.label, maxLines = 1)
+        Text(text, Modifier.pressScale(interaction).padding(horizontal = 16.dp), style = HauntTheme.type.label, maxLines = 1)
     }
 }
 
-/** Round glass button (back button on overlay screens). */
+/**
+ * Round glass button (back button on overlay screens). [iconModifier] transforms the icon only
+ * (e.g. a spinner's rotation), never the glass.
+ */
 @Composable
 fun GlassIconButton(
     icon: ImageVector,
@@ -243,17 +246,17 @@ fun GlassIconButton(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
     iconSize: Dp = 20.dp,
+    iconModifier: Modifier = Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     GlassSurface(
         modifier
-            .pressScale(interaction)
             .size(size)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, size = iconSize, tint = HauntTheme.colors.text)
+        Icon(icon, null, modifier = Modifier.pressScale(interaction).then(iconModifier), size = iconSize, tint = HauntTheme.colors.text)
     }
 }
 
