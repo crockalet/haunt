@@ -1,0 +1,71 @@
+package io.github.crockalet.haunt.ui.state
+
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Color
+import io.github.crockalet.haunt.core.LatLng
+import io.github.crockalet.haunt.core.LoopMode
+import io.github.crockalet.haunt.core.Speed
+
+/** The three map modes in the toolbar. */
+enum class MapMode { Pin, Route, Joystick }
+
+/** Speed chips in the route card. */
+enum class SpeedPreset(val label: String, val speed: Speed?) {
+    Walk("Walk", Speed.Walk),
+    Cycle("Cycle", Speed.Cycle),
+    Drive("Drive", Speed.Drive),
+    Custom("Custom", null),
+}
+
+/** A place in search results, favourites, history or recents. */
+@Immutable
+data class Place(
+    val name: String,
+    val position: LatLng,
+    /** Secondary line ("Dogenzaka, Shibuya"). Null → coordinates are shown. */
+    val subtitle: String? = null,
+    /** Right-aligned meta ("20 m", "Today"). */
+    val meta: String? = null,
+    val folderId: String? = null,
+)
+
+@Immutable
+data class Folder(val id: String, val name: String, val color: Color)
+
+@Immutable
+data class Track(val name: String, val subtitle: String, val points: List<LatLng> = emptyList())
+
+@Immutable
+data class LogEntry(val time: String, val text: String, val ok: Boolean = true)
+
+@Immutable
+data class AgentConnection(val name: String, val via: String)
+
+@Immutable
+data class ServiceEndpoint(val title: String, val provider: String, val url: String)
+
+/** Result of parsing pasted text as coordinates. The real parser lives elsewhere; see [parseSimpleCoordinates]. */
+@Immutable
+data class DetectedCoordinates(val position: LatLng, val format: String? = null)
+
+/** Default per-user settings shown in Settings → Defaults. */
+@Immutable
+data class HauntDefaults(
+    val updateRateHz: Int = 1,
+    val accuracyMeters: Float = 5f,
+    val metric: Boolean = true,
+    val loop: LoopMode = LoopMode.Once,
+)
+
+/** MapLibre style URLs; see https://openfreemap.org. */
+@Immutable
+data class MapStyle(val lightUrl: String, val darkUrl: String) {
+    fun url(dark: Boolean) = if (dark) darkUrl else lightUrl
+
+    companion object {
+        val OpenFreeMap = MapStyle(
+            lightUrl = "https://tiles.openfreemap.org/styles/positron",
+            darkUrl = "https://tiles.openfreemap.org/styles/dark",
+        )
+    }
+}
