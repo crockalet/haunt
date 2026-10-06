@@ -1,0 +1,59 @@
+name: Nightly
+
+# Rolling "nightly" pre-release with debug APKs + CLI, rebuilt on every push to main.
+# Stable install link: https://github.com/crockalet/haunt/releases/download/nightly/haunt-foss.apk
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-37.0 build-tools;37.0.0 platform-tools"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Each build gets a higher versionCode so nightlies install over each other
+      # (all signed with the shared debug key in androidApp/debug.keystore).
+      - name: Build APKs and CLI
+        run: >
+          ./gradlew --no-configuration-cache
+          :androidApp:assembleFossDebug :androidApp:assemblePlayDebug :cli:distZip
+          -Phaunt.versionCode=${{ github.run_number }} -Phaunt.versionSuffix=-nightly.${{ github.run_number }}
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          cp androidApp/build/outputs/apk/foss/debug/androidApp-foss-debug.apk dist/haunt-foss.apk
+          cp androidApp/build/outputs/apk/play/debug/androidApp-play-debug.apk dist/haunt-play.apk
+          cp cli/build/distributions/haunt.zip dist/haunt-cli.zip
+          git tag -f nightly "$GITHUB_SHA"
+          git push -f origin refs/tags/nightly
+          notes="Debug build #${GITHUB_RUN_NUMBER} from ${GITHUB_SHA::7}. Install haunt-foss.apk; haunt-play.apk adds the Play Services fused mock."
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly --title "Nightly #${GITHUB_RUN_NUMBER}" --notes "$notes" --prerelease
+          else
+            gh release create nightly --title "Nightly #${GITHUB_RUN_NUMBER}" --notes "$notes" --prerelease --verify-tag
+          fi
+          gh release upload nightly dist/* --clobber
