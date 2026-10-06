@@ -35,7 +35,7 @@
 | D1 | Place search (Photon by default) |
 | D2 | Favourites (folders, colours) + history |
 | D3 | Paste coordinates in any format (decimal, DMS, Google Maps URL, plus code) |
-| E1 | Material 3 Expressive, dynamic colour, dark mode (Compose Multiplatform) |
+| E1 | "Glass" UI (custom, not Material), light + dark themes (Compose Multiplatform) |
 | E2 | MapLibre maps; free default tiles; **user-configurable tile / routing / geocoding endpoints** |
 | R1 | Free, GPL-3.0; F-Droid + GitHub Releases + Play Store |
 
@@ -111,7 +111,7 @@ haunt/
 └─ desktopApp/     (later) Compose Desktop companion — reuses ui/data/core/protocol.
 ```
 
-**Stack:** Kotlin 2.x · Compose Multiplatform · coroutines/Flow · kotlinx.serialization · Ktor client ·
+**Stack:** Kotlin 2.x · Compose Multiplatform (Foundation, custom components; no Material) · Haze · coroutines/Flow · kotlinx.serialization · Ktor client ·
 SQLDelight · Koin · maplibre-compose · Clikt · MCP Kotlin SDK. Gradle version catalog, convention plugins.
 
 ---
@@ -261,21 +261,32 @@ the app falls back to straight lines and tells the user.
 
 ## 8. UI (shared/ui)
 
-**Home / Map** (single main screen)
-- Full-bleed map, search bar on top (places + coordinate paste).
-- Mode switcher: **Pin · Route · Joystick**.
-- Bottom sheet: current fake location, state, speed chips, big **Haunt / Stop** button.
-- Pin mode: long-press to drop. Route mode: tap to add waypoints, toggle "follow roads", loop mode.
-  Joystick mode: thumbstick bottom-left, speed slider.
-- Small "agent connected" indicator when an ADB client is attached.
+Mockups: [Haunt Screens canvas](https://claude.ai/artifact/BjzUyRME1DM2KfYsU3EkTG). The "Final direction" row is the source of truth.
 
-**Library:** Favourites (folders) · History · Imported tracks.
-**Settings:** Map & services endpoints · ADB control + activity log · Defaults (accuracy, altitude, update rate, units) · About / licences.
-**Onboarding:** Welcome → enable developer options → select mock app (deep link to settings, live check) →
+**Visual direction: "Glass" (not Material).** Built from our own small component set on Compose Foundation,
+so it shares across platforms and is not tied to Material.
+- Frosted, translucent capsules and cards (backdrop blur) over a quiet, low-saturation map.
+  Blur on Android/iOS/desktop via [Haze](https://github.com/chrisbanes/haze), with a solid fallback when blur is unavailable.
+- Light and dark themes (follow the system by default). Neutral greys; one calm blue accent
+  (`#2F6BFF` light / `#6E9BFF` dark), used only for the location, active state and the main action.
+- Type: Plus Jakarta Sans for UI, JetBrains Mono for coordinates and data.
+- Map: a custom MapLibre style matching the mockups (soft neutral land, muted parks/water, white roads in light;
+  charcoal equivalents in dark).
+
+**Map screen** (single main screen; map takes the full screen, no bottom nav)
+- Top: glass search pill (places + coordinate paste) with Library and Settings buttons; a status chip below it.
+- Bottom, **collapsed by default:** a floating toolbar with **Pin · Route · Joystick**
+  (+ pause in Route mode) and an expand arrow, plus a separate round **Stop** button.
+- Expanding opens a glass details card above the toolbar (place, coordinates, altitude/accuracy/rate;
+  route progress, speed presets, follow roads, loop mode; joystick speed).
+- Joystick mode: thumbstick floats over the map on the left.
+
+**Search:** full-screen glass sheet over a blurred map; detects pasted coordinates ("Haunt here"), nearby places, recent.
+**Library:** Favourites (folders) · History · Tracks; import GPX / KML.
+**Settings:** ADB control + activity log · "Connect an AI agent" (`claude mcp add haunt -- haunt mcp`) ·
+map & service endpoints · defaults (theme, update rate, accuracy, units).
+**Onboarding:** enable developer options → select mock app (deep link to settings, live check) →
 location + notification permissions → done.
-
-Visual direction: Material 3 Expressive, dynamic colour with a ghostly violet fallback palette, dark-first map style.
-Mockups to come in the next step.
 
 ---
 
