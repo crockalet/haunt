@@ -75,6 +75,7 @@ fun JoystickPad(
     val knobSize = 56.dp
     val maxTravel = with(density) { ((padSize - knobSize) / 2).toPx() }
     val input by rememberUpdatedState(onInput)
+    val lastBearing by rememberUpdatedState(bearingDeg)
     var drag by remember { mutableStateOf<Offset?>(null) }
     val knob = drag ?: JoystickMath.toOffset(bearingDeg, magnitude, maxTravel)
 
@@ -96,11 +97,11 @@ fun JoystickPad(
                     onDragStart = { emit(it) },
                     onDragEnd = {
                         drag = null
-                        input(bearingDeg, 0.0)
+                        input(lastBearing, 0.0)
                     },
                     onDragCancel = {
                         drag = null
-                        input(bearingDeg, 0.0)
+                        input(lastBearing, 0.0)
                     },
                     onDrag = { change, _ -> emit(change.position) },
                 )
