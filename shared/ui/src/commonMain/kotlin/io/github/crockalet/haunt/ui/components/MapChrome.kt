@@ -1,8 +1,10 @@
 package io.github.crockalet.haunt.ui.components
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,15 +102,17 @@ fun StopButton(
     contentDescription: String = "Stop haunting",
     enabled: Boolean = true,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     val c = HauntTheme.colors
     Box(
         modifier
+            .pressScale(interaction)
             .size(64.dp)
             .outerShadow(HauntShapes.pill, c.shadow)
             .clip(HauntShapes.pill)
             .background(if (enabled) c.accent else c.glassFallback)
             .then(if (!enabled) Modifier.border(1.dp, c.glassBorder, HauntShapes.pill) else Modifier)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {

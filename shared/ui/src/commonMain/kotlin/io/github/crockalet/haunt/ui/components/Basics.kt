@@ -1,8 +1,11 @@
 package io.github.crockalet.haunt.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntShapes
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 import io.github.crockalet.haunt.ui.theme.LocalContentColor
@@ -100,12 +105,14 @@ fun IconButton(
     tint: Color = HauntTheme.colors.text,
     enabled: Boolean = true,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier
+            .pressScale(interaction)
             .size(size)
             .clip(HauntShapes.pill)
             .background(background)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
@@ -124,13 +131,15 @@ fun ToolbarButton(
     neutral: Boolean = false,
     iconSize: Dp = 22.dp,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     val c = HauntTheme.colors
     Box(
         modifier
+            .pressScale(interaction)
             .size(48.dp)
             .clip(HauntShapes.pill)
-            .background(if (selected) c.selected else Color.Transparent)
-            .clickable(role = Role.Button, onClick = onClick)
+            .background(animateColorAsState(if (selected) c.selected else c.selected.copy(alpha = 0f), HauntMotion.snappy(), label = "toolbar").value)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .semantics {
                 this.contentDescription = contentDescription
                 this.selected = selected
@@ -161,14 +170,16 @@ fun PrimaryButton(
     shadow: Boolean = false,
     horizontalPadding: Dp = 20.dp,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     val c = HauntTheme.colors
     Row(
         modifier
+            .pressScale(interaction)
             .height(height)
             .then(if (shadow) Modifier.outerShadow(HauntShapes.pill, c.shadow) else Modifier)
             .clip(HauntShapes.pill)
             .background(c.accent)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .padding(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -187,13 +198,15 @@ fun TonalButton(
     height: Dp = 48.dp,
     style: TextStyle = HauntTheme.type.bodyStrong,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     val c = HauntTheme.colors
     Box(
         modifier
+            .pressScale(interaction)
             .height(height)
             .clip(HauntShapes.pill)
             .background(c.tile)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -209,8 +222,12 @@ fun GlassButton(
     modifier: Modifier = Modifier,
     height: Dp = 40.dp,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     GlassSurface(
-        modifier.height(height).clickable(role = Role.Button, onClick = onClick),
+        modifier
+            .pressScale(interaction)
+            .height(height)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, Modifier.padding(horizontal = 16.dp), style = HauntTheme.type.label, maxLines = 1)
@@ -227,10 +244,12 @@ fun GlassIconButton(
     size: Dp = 48.dp,
     iconSize: Dp = 20.dp,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     GlassSurface(
         modifier
+            .pressScale(interaction)
             .size(size)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
