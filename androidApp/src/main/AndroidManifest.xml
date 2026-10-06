@@ -11,13 +11,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Map tiles (OpenFreeMap) and styles. -->
+    <!-- Map tiles and styles (OpenFreeMap), place search and routing. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".HauntApplication"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="Haunt"
         android:supportsRtl="true">
         <activity

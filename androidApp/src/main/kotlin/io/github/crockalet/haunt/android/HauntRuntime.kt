@@ -17,6 +17,8 @@ import io.github.crockalet.haunt.android.control.summarizeParams
 import io.github.crockalet.haunt.android.data.ActivityLog
 import io.github.crockalet.haunt.android.data.ActivitySource
 import io.github.crockalet.haunt.android.data.FavoritesStore
+import io.github.crockalet.haunt.android.data.HistoryStore
+import io.github.crockalet.haunt.android.data.TracksStore
 import io.github.crockalet.haunt.android.inject.FlavourInjection
 import io.github.crockalet.haunt.android.inject.InjectionPipeline
 import io.github.crockalet.haunt.android.inject.InjectionStatus
@@ -71,6 +73,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * - **Settings:** [settings] (StateFlow) and [updateSettings] / [setAdbControlEnabled].
  * - **Agent activity log:** [activityLog]`.entries` (StateFlow, newest last) and `clear()`.
  * - **Favourites:** [favorites] (`favorites` StateFlow, `save`, `delete`; file I/O → call off main).
+ * - **History / tracks:** [history] (recorded automatically whenever Haunt holds a new place) and
+ *   [tracks] (imported GPX / KML); both StateFlow-backed JSON files, file I/O → call off main.
  * - **Onboarding checks:** [mockAppSelected], [hasLocationPermission], [hasNotificationPermission],
  *   [readiness].
  * - **Services:** [startControlService] (open the ADB socket now), [startMockingService], [stopMocking].
@@ -106,6 +110,10 @@ class HauntRuntime internal constructor(context: Context) {
     val activityLog = ActivityLog()
 
     val favorites = FavoritesStore(File(app.filesDir, FAVORITES_FILE))
+
+    val history = HistoryStore(File(app.filesDir, HISTORY_FILE))
+
+    val tracks = TracksStore(File(app.filesDir, TRACKS_FILE))
 
     // --- controller & events ----------------------------------------------------------------------
 
@@ -192,6 +200,16 @@ class HauntRuntime internal constructor(context: Context) {
         // Whatever starts mocking (UI, socket, broadcast), keep the foreground service running.
         scope.launch {
             state.map { it !is HauntState.Idle }.distinctUntilChanged().collect { active -> if (active) startMockingService() }
+        }
+        // History: every new place Haunt holds (pins, searches, arrivals, agent calls).
+        scope.launch(Dispatchers.IO) {
+            state.map { (it as? HauntState.Holding)?.let { h -> h.fix.position to h.label } }
+                .distinctUntilChanged()
+                .collect { held ->
+                    val (position, label) = held ?: return@collect
+                    runCatching { history.record(label ?: "Dropped pin", position) }
+                        .onFailure { Log.w(TAG, "Could not record history", it) }
+                }
         }
         // Keep the shared notification current while a service shows it.
         @OptIn(FlowPreview::class)
@@ -293,6 +311,8 @@ class HauntRuntime internal constructor(context: Context) {
         private const val TAG = "HauntRuntime"
         private const val PREFS_NAME = "haunt_settings"
         private const val FAVORITES_FILE = "favorites.json"
+        private const val HISTORY_FILE = "history.json"
+        private const val TRACKS_FILE = "tracks.json"
         private const val NOTIFICATION_INTERVAL_MS = 1000L
 
         const val LOCATION_PERMISSION_HINT =

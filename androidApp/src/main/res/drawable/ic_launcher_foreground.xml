@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon foreground (108dp canvas, 66dp safe zone): the ghost marker's outline
+     (shared/ui GhostMarker, 44×52 viewBox) in white, with its eyes cut out. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.9"
+        android:scaleY="0.9"
+        android:translateX="34.2"
+        android:translateY="30.6">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M22,2C11,2 4,10 4,21L4,48L10,43L16,48L22,43L28,48L34,43L40,48L40,21C40,10 33,2 22,2Z M12.5,21a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0Z M24.5,21a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0Z" />
+    </group>
+</vector>
