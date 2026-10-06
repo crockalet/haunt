@@ -1,7 +1,7 @@
 # Haunt — notes for agents
 
 Free, open-source mock-location app (Android first) built with Kotlin Multiplatform, controllable by AI agents over ADB.
-Design: `docs/DESIGN.md` (source of truth for architecture, protocol and UI).
+Start with `docs/STATUS.md` (current state, next steps, decision log). Design: `docs/DESIGN.md` (architecture, protocol, UI).
 
 ## Layout
 - `shared/core` — KMP (android + jvm). Models, geo maths, movement engine, `HauntController`. No platform deps.
@@ -25,3 +25,11 @@ Package root: `io.github.crockalet.haunt`.
 - Kotlin official style, 4-space indent, no wildcard imports.
 - Keep platform code out of `shared/*` commonMain; use `expect`/`actual` only when unavoidable.
 - Tests for anything with logic (geo maths, engine, parsers, protocol).
+
+## Environment gotchas (cloud sessions)
+- `.claude/settings.json` runs `scripts/setup-cloud-env.sh` on session start: installs Android SDK pieces into
+  `~/android-sdk`, writes `local.properties`, and routes Maven Central through Google's mirror
+  (`~/.gradle/init.d/mirror.init.gradle.kts`) because Maven Central returns HTTP 429 to the cloud proxy.
+- No KVM in the cloud container, so no emulator; verify with unit tests and the JVM screenshot tests
+  (`./gradlew :shared:ui:jvmTest` → `shared/ui/build/screenshots/`, copied to `docs/screenshots/`).
+- Pushing `.github/workflows/*` needs the GitHub `workflow` permission (Claude GitHub App).
