@@ -18,7 +18,9 @@ import io.github.crockalet.haunt.ui.state.Geo
 import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
+import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.SampleData
+import io.github.crockalet.haunt.ui.state.SpeedPreset
 import io.github.crockalet.haunt.ui.theme.ThemeMode
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -113,6 +115,20 @@ class Screenshots {
     fun mapRoute() {
         shot("03-map-route") { App(it, moving, routeLocal) }
         shot("04-map-route-expanded") { App(it, moving, routeLocal.copy(expanded = true)) }
+    }
+
+    @Test
+    fun mapRouteCustomSpeedAndNotice() {
+        shot("11-map-route-custom-notice") {
+            App(it, moving, routeLocal.copy(expanded = true, speedPreset = SpeedPreset.Custom)) { s ->
+                s.map.showNotice(
+                    Notice(
+                        "Haunt isn't the selected mock location app",
+                        "Developer options → Select mock location app → Haunt.",
+                    ),
+                )
+            }
+        }
     }
 
     @Test

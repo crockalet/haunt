@@ -42,6 +42,8 @@ data class HauntColors(
     val selected: Color,
     val selectedContent: Color,
     val halo: Color,
+    /** Error dot in notices (the only non-accent hue outside the map). */
+    val danger: Color = Color(0xFFE5484D),
 )
 
 val LightHauntColors = HauntColors(

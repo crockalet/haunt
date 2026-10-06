@@ -49,6 +49,7 @@ import io.github.crockalet.haunt.ui.components.VerticalHairline
 import io.github.crockalet.haunt.ui.icons.HauntIcons
 import io.github.crockalet.haunt.ui.state.JoystickDetails
 import io.github.crockalet.haunt.ui.state.MapMode
+import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.MapUiState
 import io.github.crockalet.haunt.ui.state.PinDetails
 import io.github.crockalet.haunt.ui.state.RouteDetails
@@ -72,6 +73,7 @@ data class MapActions(
     val onFollowRoads: (Boolean) -> Unit = {},
     val onLoop: (LoopMode) -> Unit = {},
     val onRate: () -> Unit = {},
+    val onCustomSpeed: (Float) -> Unit = {},
     val onJoystick: (bearingDeg: Double, magnitude: Double) -> Unit = { _, _ -> },
     val onJoystickMaxSpeed: (Float) -> Unit = {},
 )
@@ -238,6 +240,20 @@ private fun RouteCard(route: RouteDetails, actions: MapActions) {
                 )
             }
         }
+        if (route.speedPreset == SpeedPreset.Custom) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                    Text("Custom speed", style = HauntTheme.type.bodyStrong)
+                    Text(route.speedLabel, style = HauntTheme.type.coords, color = c.muted)
+                }
+                Slider(
+                    route.customKmh,
+                    actions.onCustomSpeed,
+                    valueRange = MapStateHolder.CustomSpeedRangeKmh,
+                    contentDescription = "Custom speed",
+                )
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Follow roads", Modifier.weight(1f), style = HauntTheme.type.bodyStrong)
             Switch(route.followRoads, actions.onFollowRoads, contentDescription = "Follow roads")
@@ -259,7 +275,7 @@ private fun RouteCard(route: RouteDetails, actions: MapActions) {
                     }
                 },
             )
-            Chip("${route.rate}×", selected = false, onClick = actions.onRate, textStyle = HauntTheme.type.label.copy(fontFamily = HauntTheme.type.mono))
+            Chip(route.rateLabel, selected = false, onClick = actions.onRate, textStyle = HauntTheme.type.label.copy(fontFamily = HauntTheme.type.mono))
         }
     }
 }

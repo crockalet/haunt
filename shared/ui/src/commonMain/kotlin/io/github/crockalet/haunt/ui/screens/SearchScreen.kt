@@ -48,7 +48,7 @@ import io.github.crockalet.haunt.ui.theme.HauntShapes
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 
 @Immutable
-data class DetectedUi(val position: LatLng, val area: String?)
+data class DetectedUi(val position: LatLng, val area: String?, val label: String = "Coordinates detected")
 
 @Immutable
 data class SearchUiState(
@@ -57,6 +57,8 @@ data class SearchUiState(
     val results: List<Place> = emptyList(),
     val nearby: List<Place> = emptyList(),
     val recent: List<Place> = emptyList(),
+    /** Status line under the field ("Searching…", a search error). */
+    val notice: String? = null,
 )
 
 @Immutable
@@ -123,6 +125,10 @@ fun SearchScreen(
         ) {
             state.detected?.let { DetectedCard(it, actions) }
 
+            state.notice?.let {
+                Text(it, Modifier.padding(horizontal = 6.dp), style = HauntTheme.type.caption, color = c.muted)
+            }
+
             if (state.results.isNotEmpty()) {
                 PlaceSection("Results", state.results, actions, recent = false)
             }
@@ -155,7 +161,7 @@ private fun DetectedCard(d: DetectedUi, actions: SearchActions) {
                     Modifier.height(24.dp).clip(HauntShapes.pill).background(c.selected).padding(horizontal = 10.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("Coordinates detected", style = HauntTheme.type.badge, color = c.selectedContent, maxLines = 1)
+                    Text(d.label, style = HauntTheme.type.badge, color = c.selectedContent, maxLines = 1)
                 }
                 d.area?.let { Text(it, style = HauntTheme.type.caption, color = c.muted, maxLines = 1) }
             }

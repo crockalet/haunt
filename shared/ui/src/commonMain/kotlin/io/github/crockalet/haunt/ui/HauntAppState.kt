@@ -11,7 +11,12 @@ import androidx.compose.runtime.setValue
 import io.github.crockalet.haunt.core.HauntController
 import io.github.crockalet.haunt.ui.screens.LibraryTab
 import io.github.crockalet.haunt.ui.screens.OnboardingUiState
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.crockalet.haunt.ui.state.ControllerCommands
+import io.github.crockalet.haunt.ui.state.HauntCommands
 import io.github.crockalet.haunt.ui.state.HauntDefaults
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.theme.ThemeMode
@@ -33,8 +38,10 @@ class HauntAppState(
     onboarding: OnboardingUiState? = null,
     initialQuery: String = "",
     initialLibraryTab: LibraryTab = LibraryTab.Favourites,
+    commands: HauntCommands = ControllerCommands(controller),
+    scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
 ) {
-    val map = MapStateHolder(controller, initialLocal, defaults)
+    val map = MapStateHolder(controller, initialLocal, defaults, commands, scope)
 
     var screen by mutableStateOf(initialScreen)
         private set
@@ -72,9 +79,14 @@ fun rememberHauntAppState(
     initialLocal: LocalUiState = LocalUiState(),
     defaults: HauntDefaults = HauntDefaults(),
     onboarding: OnboardingUiState? = null,
+    commands: HauntCommands = ControllerCommands(controller),
 ): HauntAppState {
-    val state = remember(controller) {
-        HauntAppState(controller, initialScreen, initialTheme, initialLocal, defaults, onboarding)
+    val scope = rememberCoroutineScope()
+    val state = remember(controller, commands) {
+        HauntAppState(
+            controller, initialScreen, initialTheme, initialLocal, defaults, onboarding,
+            commands = commands, scope = scope,
+        )
     }
     val engine by controller.state.collectAsState()
     LaunchedEffect(state, engine) { state.map.onEngineState(engine) }
