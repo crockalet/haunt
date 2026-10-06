@@ -184,6 +184,17 @@ class DefaultHauntController(
         }
     }
 
+    override fun setLoopMode(loop: LoopMode) {
+        transition(newSession = false) { mode ->
+            when {
+                mode !is Mode.Play || mode.loop == loop -> mode
+                // Only ping-pong travels backwards; elsewhere carry on forwards from the same spot.
+                loop == LoopMode.PingPong -> mode.copy(loop = loop)
+                else -> mode.copy(loop = loop, forward = true)
+            }
+        }
+    }
+
     override fun pause() = setPaused(true)
 
     override fun resume() = setPaused(false)

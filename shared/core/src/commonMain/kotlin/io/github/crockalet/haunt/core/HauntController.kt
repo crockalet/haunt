@@ -41,6 +41,13 @@ interface HauntController {
      */
     fun setPlaybackRate(multiplier: Double) {}
 
+    /**
+     * Changes the loop mode of the route that is playing, without restarting it (the playhead keeps
+     * its position). Ignored when no route is playing. Implementations that can't change it live
+     * may ignore it.
+     */
+    fun setLoopMode(loop: LoopMode) {}
+
     fun pause()
 
     fun resume()
