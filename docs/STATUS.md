@@ -14,7 +14,7 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
 | `shared/ui` | Done | Glass design system (Haze), all screens from the mockups, light/dark, screenshot tests → `docs/screenshots/`. Map = maplibre-compose (Android); drawn stand-in on JVM. |
 | `androidApp` | Done, ~45 tests | `HauntRuntime` (settings, favourites, history, tracks, activity log), test-provider injection (+ fused mock in `play` flavour), `HauntService` (location FGS + notification), `ControlService` (socket server, peer-uid check), `AdbCommandReceiver` (broadcast fallback), Photon search/reverse, OSRM routing, onboarding, GPX/KML import, launcher icon. |
 | CI | Enabled | `.github/workflows/ci.yml` (added 2026-10-06): on push to `main`, PRs and manual dispatch — jvm + androidApp unit tests, CLI dist, foss/play debug APKs (artifact `haunt-debug`; test reports on failure). Cloud sessions can't push changes to workflow files (no `workflow` scope); edit them from a normal checkout or the GitHub web UI. |
-| Nightly | Pending merge of `.github/workflows/nightly.yml` | On each push to `main`: rolling `nightly` pre-release with `haunt-foss.apk`, `haunt-play.apk`, `haunt-cli.zip` (versionCode = run number, shared debug key `androidApp/debug.keystore`). Install link: https://github.com/crockalet/haunt/releases/download/nightly/haunt-foss.apk |
+| Nightly | Enabled (`.github/workflows/nightly.yml`) | On each push to `main`: rolling `nightly` pre-release with `haunt-foss.apk`, `haunt-play.apk`, `haunt-cli.zip` (versionCode = run number, shared debug key `androidApp/debug.keystore`). Install link: https://github.com/crockalet/haunt/releases/download/nightly/haunt-foss.apk |
 
 ## Next steps (in order)
 1. **On-device test pass** (real phone or an emulator with KVM). Checklist:
@@ -25,7 +25,14 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
    - CLI + MCP against the device: `haunt set`, `go --roads`, `play track.gpx --rate 2x`, `watch --until-finished`, and `claude mcp add haunt -- haunt mcp`.
    - Live Photon search/reverse, OSRM routing, MapLibre long-press, glass blur performance, adaptive icon, targetSdk 37 behaviour.
    - `play` flavour: fused mock mode actually reaching apps that use Play Services location.
-2. **Gaps to close**: custom muted MapLibre style matching the mockups (currently stock OpenFreeMap positron/dark); OSRM public demo only serves `driving` (walking routes follow car roads unless the user points Settings → Routing at a server with a `foot` profile; consider defaulting walk/cycle routes to a public foot/bike server, or a Valhalla backend). Done 2026-10-06: service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
+   - Floating joystick: permission flow, shows only in the background in joystick mode, steering works over
+     another app (e.g. Google Maps), grip drag moves the window smoothly and the spot survives rotation, "open
+     Haunt" button. In-app pad grip drag + clamping, all four pad sizes. Morph/spring animations feel right on device.
+   - Map style: Haunt light / dark style loads (glyphs + tiles from OpenFreeMap), switches with the theme,
+     custom style URL in Settings → Map style still works.
+   - Locate button: real fix when idle (Pin / Joystick / Route behaviours), cached fix or hint while faking, map
+     opens on the real position. Swiping Haunt from Recents stops faking, the notification and both services.
+2. **Gaps to close**: OSRM public demo only serves `driving` (walking routes follow car roads unless the user points Settings → Routing at a server with a `foot` profile; consider defaulting walk/cycle routes to a public foot/bike server, or a Valhalla backend). Done 2026-10-06: Haunt's own map style (`HauntMapStyle`: light / dark from the theme palette over OpenFreeMap tiles, no icons; previews `docs/screenshots/14-map-style-*.png` rendered with MapLibre GL JS), service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
 3. **Release prep (M5)**: release signing, F-Droid metadata, Play listing "Haunt: Fake GPS Location" (Play may ask about the `specialUse` FGS), CLI distribution (fat JAR now; consider GraalVM native image / Homebrew).
 4. Backlog features: see `docs/DESIGN.md` §1 (QS tile, realism/jitter, scenario files, desktop companion for iOS, …).
 
@@ -41,6 +48,9 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
 | UI: **Glass** (custom components on Compose Foundation + Haze), **not Material**; light + dark; one blue accent; quiet "Simple" map style | Chosen after several rounds of mockups (layouts A–D, Instrument/Glass/Brutal/HUD/Simple). |
 | Map controls **collapsed by default** (floating toolbar + stop button, expandable card), no bottom nav | User wanted the map to dominate. |
 | Application ID `io.github.crockalet.haunt` is final | Confirmed by the user 2026-10-06; it can't change after publishing. |
+| Animations: Compose built-ins (shared bounds, `AnimatedContent`, springs), no library | Morphlet (user's reference) is React Native; Compose has the same primitives. |
+| Floating joystick via `SYSTEM_ALERT_WINDOW` overlay, opt-in | Joystick must work while another app is in front; only asked for when the user turns it on. |
+| Map style generated in code (`HauntMapStyle`) from the theme's map colours, not a hosted style | Real map matches the drawn one and the glass UI, follows light / dark, no style server to host; any OpenMapTiles TileJSON works. |
 | Fonts: Plus Jakarta Sans (UI), JetBrains Mono (data) | Bundled, OFL. |
 
 ## Design references

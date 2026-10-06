@@ -22,6 +22,7 @@ import io.github.crockalet.haunt.android.data.TracksStore
 import io.github.crockalet.haunt.android.inject.FlavourInjection
 import io.github.crockalet.haunt.android.inject.InjectionPipeline
 import io.github.crockalet.haunt.android.inject.InjectionStatus
+import io.github.crockalet.haunt.android.location.RealLocation
 import io.github.crockalet.haunt.android.net.Geocoder
 import io.github.crockalet.haunt.android.net.OsrmRouter
 import io.github.crockalet.haunt.android.net.PhotonGeocoder
@@ -161,6 +162,9 @@ class HauntRuntime internal constructor(context: Context) {
 
     val geocoder: Geocoder = PhotonGeocoder(http) { settings.value.searchUrl }
 
+    /** The device's real position (locate button); see [RealLocation] for how it copes with faking. */
+    val realLocation = RealLocation(app, isFaking = { state.value !is HauntState.Idle })
+
     val router: Router = OsrmRouter(http, { settings.value.routingUrl }, { settings.value.routingProfile })
 
     // --- API & ADB control ------------------------------------------------------------------------
@@ -191,6 +195,15 @@ class HauntRuntime internal constructor(context: Context) {
     val controlServer = ControlServer(scope, rpcServer, activityLog)
 
     private val foregroundServices = MutableStateFlow(0)
+
+    private val _appVisible = MutableStateFlow(false)
+
+    /** Whether Haunt's own UI is on screen (MainActivity started); the floating joystick hides then. */
+    val appVisible: StateFlow<Boolean> = _appVisible.asStateFlow()
+
+    internal fun setAppVisible(visible: Boolean) {
+        _appVisible.value = visible
+    }
 
     init {
         // Live-apply accuracy/altitude defaults and the update rate.

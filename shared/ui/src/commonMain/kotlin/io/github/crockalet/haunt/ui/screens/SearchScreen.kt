@@ -41,6 +41,7 @@ import io.github.crockalet.haunt.ui.components.RowDivider
 import io.github.crockalet.haunt.ui.components.SectionHeader
 import io.github.crockalet.haunt.ui.components.Text
 import io.github.crockalet.haunt.ui.components.TonalButton
+import io.github.crockalet.haunt.ui.components.morph
 import io.github.crockalet.haunt.ui.icons.HauntIcons
 import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.Place
@@ -90,7 +91,7 @@ fun SearchScreen(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             GlassIconButton(HauntIcons.Back, "Back to map", actions.onBack, size = 52.dp)
-            GlassSurface(Modifier.weight(1f).height(52.dp), borderColor = c.accent) {
+            GlassSurface(Modifier.weight(1f).height(52.dp).morph(MorphKeys.Search), borderColor = c.accent) {
                 Row(Modifier.height(52.dp).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
                         val looksLikeCoords = state.detected != null

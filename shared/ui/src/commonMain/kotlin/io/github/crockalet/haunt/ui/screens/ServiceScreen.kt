@@ -112,7 +112,7 @@ fun ServiceScreen(
 }
 
 private fun hint(kind: ServiceKind?): String = when (kind) {
-    ServiceKind.MapStyle -> "A MapLibre style JSON URL. The default OpenFreeMap style follows the light / dark theme; a custom one is used for both."
+    ServiceKind.MapStyle -> "By default Haunt draws its own light / dark style over OpenFreeMap's free tiles. Paste a MapLibre style JSON URL to use a different map (for both themes)."
     ServiceKind.Search -> "A Photon geocoder for place search and nearby places — the public photon.komoot.io or your own."
     ServiceKind.Routing -> "An OSRM server for road-following routes. The public demo only serves driving; for walking or cycling routes, point this at a server with the foot or bike profile."
     null -> ""

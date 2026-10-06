@@ -1,5 +1,19 @@
 package io.github.crockalet.haunt.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -7,35 +21,31 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
-import io.github.crockalet.haunt.ui.components.NoticeBanner
-import io.github.crockalet.haunt.ui.state.Notice
-import kotlinx.coroutines.delay
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import io.github.crockalet.haunt.core.HauntController
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.ui.components.GlassVeil
 import io.github.crockalet.haunt.ui.components.LocalHazeState
+import io.github.crockalet.haunt.ui.components.LocalMorphScope
+import io.github.crockalet.haunt.ui.components.MorphScope
+import io.github.crockalet.haunt.ui.components.NoticeBanner
 import io.github.crockalet.haunt.ui.map.HauntMap
 import io.github.crockalet.haunt.ui.platform.PlatformBackHandler
 import io.github.crockalet.haunt.ui.screens.ActivityLogScreen
+import io.github.crockalet.haunt.ui.screens.ConnectAgentCommand
 import io.github.crockalet.haunt.ui.screens.DetectedUi
 import io.github.crockalet.haunt.ui.screens.LibraryActions
 import io.github.crockalet.haunt.ui.screens.LibraryScreen
@@ -47,22 +57,27 @@ import io.github.crockalet.haunt.ui.screens.OnboardingScreen
 import io.github.crockalet.haunt.ui.screens.SearchActions
 import io.github.crockalet.haunt.ui.screens.SearchScreen
 import io.github.crockalet.haunt.ui.screens.SearchUiState
-import io.github.crockalet.haunt.ui.screens.SettingsActions
-import io.github.crockalet.haunt.ui.screens.SettingsScreen
-import io.github.crockalet.haunt.ui.screens.SettingsUiState
 import io.github.crockalet.haunt.ui.screens.ServiceActions
 import io.github.crockalet.haunt.ui.screens.ServiceScreen
 import io.github.crockalet.haunt.ui.screens.ServiceUiState
-import io.github.crockalet.haunt.ui.screens.ConnectAgentCommand
+import io.github.crockalet.haunt.ui.screens.SettingsActions
+import io.github.crockalet.haunt.ui.screens.SettingsScreen
+import io.github.crockalet.haunt.ui.screens.SettingsUiState
 import io.github.crockalet.haunt.ui.state.DetectedCoordinates
 import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.HauntAppData
+import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.MapStyle
+import io.github.crockalet.haunt.ui.state.MapUiState
+import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.Place
 import io.github.crockalet.haunt.ui.state.collectUiState
 import io.github.crockalet.haunt.ui.state.detectCoordinates
+import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 import io.github.crockalet.haunt.ui.theme.ThemeMode
+import kotlinx.coroutines.delay
 
 /**
  * Haunt's UI entry point: full-screen map with the Glass chrome, plus Search, Library, Settings
@@ -70,18 +85,19 @@ import io.github.crockalet.haunt.ui.theme.ThemeMode
  *
  * @param controller engine; the UI only reads [HauntController.state] and calls its commands.
  * @param data app-provided lists and hooks (favourites, agent status…).
- * @param mapStyle MapLibre style URLs (light/dark). OpenFreeMap by default.
+ * @param mapStyle what the map draws; Haunt's own light / dark style over OpenFreeMap by default.
  * @param parseCoordinates turns pasted text into coordinates; the app passes [detectCoordinates] with
  *   a reference point for short plus codes.
  * @param onThemeChange persist the theme override chosen in Settings.
  * @param onboardingActions drives onboarding when [HauntAppState.onboarding] is set.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HauntApp(
     controller: HauntController,
     modifier: Modifier = Modifier,
     data: HauntAppData = HauntAppData(),
-    mapStyle: MapStyle = MapStyle.OpenFreeMap,
+    mapStyle: MapStyle = MapStyle.Default,
     parseCoordinates: (String) -> DetectedCoordinates? = { detectCoordinates(it) },
     state: HauntAppState = rememberHauntAppState(controller),
     onThemeChange: (ThemeMode) -> Unit = {},
@@ -91,8 +107,6 @@ fun HauntApp(
         val haze = rememberHazeState()
         val holder = state.map
         val ui = holder.collectUiState()
-        @Suppress("DEPRECATION")
-        val clipboard = LocalClipboardManager.current
         val colors = HauntTheme.colors
 
         PlatformBackHandler(enabled = state.screen != Screen.Map || ui.expanded) { state.back() }
@@ -101,132 +115,34 @@ fun HauntApp(
             Box(modifier.fillMaxSize().background(colors.map)) {
                 HauntMap(
                     content = ui.map,
-                    styleUrl = mapStyle.url(colors.isDark),
+                    style = mapStyle,
                     onLongPress = holder::onMapLongPress,
                     modifier = Modifier.fillMaxSize().hazeSource(haze),
                 )
 
                 val onboarding = state.onboarding
-                when {
-                    onboarding != null -> GlassVeil(Modifier.fillMaxSize(), blurRadius = HauntDefaultsUi.onboardingBlur) {
+                if (onboarding != null) {
+                    GlassVeil(Modifier.fillMaxSize(), blurRadius = HauntDefaultsUi.onboardingBlur) {
                         OnboardingScreen(onboarding, onboardingActions)
                     }
-                    state.screen == Screen.Map -> MapScreen(
-                        state = ui,
-                        actions = remember(holder, state) {
-                            MapActions(
-                                onModeSelect = holder::selectMode,
-                                onToggleExpanded = holder::toggleExpanded,
-                                onPlayPause = holder::playPause,
-                                onStop = holder::stop,
-                                onSearch = { state.navigate(Screen.Search) },
-                                onLibrary = { state.navigate(Screen.Library) },
-                                onSettings = { state.navigate(Screen.Settings) },
-                                onSpeedPreset = holder::setSpeedPreset,
-                                onFollowRoads = holder::setFollowRoads,
-                                onLoop = holder::setLoop,
-                                onRate = holder::cycleRate,
-                                onCustomSpeed = holder::setCustomSpeed,
-                                onJoystick = holder::joystickInput,
-                                onJoystickMaxSpeed = holder::setJoystickMaxSpeed,
-                            )
-                        }.copy(
-                            onCopyCoordinates = {
-                                ui.map.fix?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
-                            },
-                            onSaveFavourite = {
-                                ui.map.fix?.let { data.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
-                            },
-                        ),
-                    )
-                    else -> GlassVeil(Modifier.fillMaxSize()) {
-                        when (state.screen) {
-                            Screen.Search -> Search(state, data, parseCoordinates) { clipboard.getText()?.text }
-                            Screen.Library -> LibraryScreen(
-                                state = LibraryUiState(
-                                    tab = state.libraryTab,
-                                    folders = data.folders,
-                                    folder = state.libraryFolder,
-                                    favourites = data.favourites,
-                                    history = data.history,
-                                    tracks = data.tracks,
-                                ),
-                                actions = LibraryActions(
-                                    onBack = { state.back() },
-                                    onTab = { state.libraryTab = it },
-                                    onFolder = { state.libraryFolder = it },
-                                    onHaunt = {
-                                        holder.hauntAt(it.position, it.name)
-                                        state.back()
-                                    },
-                                    onPlayTrack = {
-                                        if (it.points.size >= 2 || (it.route?.points?.size ?: 0) >= 2) holder.loadTrack(it)
-                                        state.back()
-                                    },
-                                    onImport = data.onImportTrack,
-                                ),
-                            )
-                            Screen.Settings -> SettingsScreen(
-                                state = SettingsUiState(
-                                    adbEnabled = data.adbControlEnabled,
-                                    connection = data.agentConnection,
-                                    log = data.activityLog,
-                                    services = data.services,
-                                    theme = state.theme,
-                                    defaults = holder.defaults,
-                                ),
-                                actions = SettingsActions(
-                                    onBack = { state.back() },
-                                    onAdbChange = data.onAdbControlChange,
-                                    onSeeAllLog = { state.navigate(Screen.ActivityLog) },
-                                    onCopyCommand = { clipboard.setText(AnnotatedString(ConnectAgentCommand)) },
-                                    onService = state::editService,
-                                    onTheme = {
-                                        state.theme = it
-                                        onThemeChange(it)
-                                    },
-                                    onUpdateRate = {
-                                        val rates = listOf(1, 2, 5, 10)
-                                        val d = holder.defaults
-                                        holder.defaults = d.copy(updateRateHz = rates[(rates.indexOf(d.updateRateHz) + 1) % rates.size])
-                                        data.onDefaultsChange(holder.defaults)
-                                    },
-                                    onAccuracy = {
-                                        val values = listOf(3f, 5f, 10f, 20f)
-                                        val d = holder.defaults
-                                        holder.defaults = d.copy(accuracyMeters = values[(values.indexOf(d.accuracyMeters) + 1) % values.size])
-                                        data.onDefaultsChange(holder.defaults)
-                                    },
-                                    onUnits = {
-                                        holder.defaults = holder.defaults.copy(metric = !holder.defaults.metric)
-                                        data.onDefaultsChange(holder.defaults)
-                                    },
-                                ),
-                            )
-                            Screen.ActivityLog -> ActivityLogScreen(
-                                log = data.activityLog,
-                                onBack = { state.back() },
-                                onClear = data.onClearLog,
-                            )
-                            Screen.Service -> state.service?.let { endpoint ->
-                                ServiceScreen(
-                                    state = ServiceUiState(
-                                        endpoint = endpoint,
-                                        url = state.serviceUrl,
-                                        profile = state.serviceProfile,
-                                        urlError = state.serviceUrlError,
-                                        profileError = state.serviceProfileError,
-                                    ),
-                                    actions = ServiceActions(
-                                        onBack = { state.back() },
-                                        onUrlChange = { state.serviceUrl = it },
-                                        onProfileChange = { state.serviceProfile = it },
-                                        onReset = state::resetService,
-                                        onSave = { state.saveService(data.onServiceSave) },
-                                    ),
-                                )
+                } else {
+                    // Screens cross-fade and scale; elements marked with `morph` (search pill → search
+                    // field) spring from one screen's bounds to the other's.
+                    SharedTransitionLayout(Modifier.fillMaxSize()) {
+                        AnimatedContent(
+                            targetState = state.screen,
+                            transitionSpec = { screenTransition(initialState, targetState) },
+                            label = "screen",
+                        ) { screen ->
+                            CompositionLocalProvider(LocalMorphScope provides MorphScope(this@SharedTransitionLayout, this)) {
+                                if (screen == Screen.Map) {
+                                    MapLayer(state, ui, data)
+                                } else {
+                                    GlassVeil(Modifier.fillMaxSize()) {
+                                        Sheet(screen, state, data, parseCoordinates, onThemeChange)
+                                    }
+                                }
                             }
-                            Screen.Map -> Unit
                         }
                     }
                 }
@@ -236,6 +152,164 @@ fun HauntApp(
         }
     }
 }
+
+/** Applies [transform] to the Settings defaults and persists them. */
+private fun HauntAppState.updateDefaults(data: HauntAppData, transform: (HauntDefaults) -> HauntDefaults) {
+    map.defaults = transform(map.defaults)
+    data.onDefaultsChange(map.defaults)
+}
+
+/** Screen-to-screen motion: deeper screens grow in, going back shrinks them away. */
+private fun AnimatedContentTransitionScope<Screen>.screenTransition(from: Screen, to: Screen): ContentTransform {
+    val forward = to.depth > from.depth
+    return (fadeIn(HauntMotion.smooth()) + scaleIn(HauntMotion.smooth(), initialScale = if (forward) 0.94f else 1.04f))
+        .togetherWith(fadeOut(HauntMotion.snappy()) + scaleOut(HauntMotion.smooth(), targetScale = if (forward) 1.04f else 0.94f))
+        .using(SizeTransform(clip = false))
+}
+
+private val Screen.depth: Int
+    get() = when (this) {
+        Screen.Map -> 0
+        Screen.Search, Screen.Library, Screen.Settings -> 1
+        Screen.ActivityLog, Screen.Service -> 2
+    }
+
+@Composable
+private fun MapLayer(state: HauntAppState, ui: MapUiState, data: HauntAppData) {
+    val holder = state.map
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
+    MapScreen(
+        state = ui,
+        actions = remember(holder, state, data) {
+            MapActions(
+                onModeSelect = holder::selectMode,
+                onToggleExpanded = holder::toggleExpanded,
+                onPlayPause = holder::playPause,
+                onStop = holder::stop,
+                onSearch = { state.navigate(Screen.Search) },
+                onLibrary = { state.navigate(Screen.Library) },
+                onSettings = { state.navigate(Screen.Settings) },
+                onSpeedPreset = holder::setSpeedPreset,
+                onFollowRoads = holder::setFollowRoads,
+                onLoop = holder::setLoop,
+                onRate = holder::cycleRate,
+                onCustomSpeed = holder::setCustomSpeed,
+                onJoystick = holder::joystickInput,
+                onJoystickMaxSpeed = holder::setJoystickMaxSpeed,
+                onJoystickSize = { size -> state.updateDefaults(data) { it.copy(joystickSize = size) } },
+                onFloatingJoystick = { on -> state.updateDefaults(data) { it.copy(floatingJoystick = on) } },
+                onJoystickMoved = { x, y -> state.updateDefaults(data) { it.copy(joystickOffsetX = x, joystickOffsetY = y) } },
+            )
+        }.copy(
+            onLocate = data.locateMe?.let { locateMe -> { holder.locate(locateMe) } },
+            onCopyCoordinates = {
+                ui.map.fix?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
+            },
+            onSaveFavourite = {
+                ui.map.fix?.let { data.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
+            },
+        ),
+    )
+}
+
+/** The glass sheets over the blurred map: Search, Library, Settings and Settings' sub-screens. */
+@Composable
+private fun Sheet(
+    screen: Screen,
+    state: HauntAppState,
+    data: HauntAppData,
+    parseCoordinates: (String) -> DetectedCoordinates?,
+    onThemeChange: (ThemeMode) -> Unit,
+) {
+    val holder = state.map
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
+    when (screen) {
+        Screen.Search -> Search(state, data, parseCoordinates) { clipboard.getText()?.text }
+        Screen.Library -> LibraryScreen(
+            state = LibraryUiState(
+                tab = state.libraryTab,
+                folders = data.folders,
+                folder = state.libraryFolder,
+                favourites = data.favourites,
+                history = data.history,
+                tracks = data.tracks,
+            ),
+            actions = LibraryActions(
+                onBack = { state.back() },
+                onTab = { state.libraryTab = it },
+                onFolder = { state.libraryFolder = it },
+                onHaunt = {
+                    holder.hauntAt(it.position, it.name)
+                    state.back()
+                },
+                onPlayTrack = {
+                    if (it.points.size >= 2 || (it.route?.points?.size ?: 0) >= 2) holder.loadTrack(it)
+                    state.back()
+                },
+                onImport = data.onImportTrack,
+            ),
+        )
+        Screen.Settings -> SettingsScreen(
+            state = SettingsUiState(
+                adbEnabled = data.adbControlEnabled,
+                connection = data.agentConnection,
+                log = data.activityLog,
+                services = data.services,
+                theme = state.theme,
+                defaults = holder.defaults,
+            ),
+            actions = SettingsActions(
+                onBack = { state.back() },
+                onAdbChange = data.onAdbControlChange,
+                onSeeAllLog = { state.navigate(Screen.ActivityLog) },
+                onCopyCommand = { clipboard.setText(AnnotatedString(ConnectAgentCommand)) },
+                onService = state::editService,
+                onTheme = {
+                    state.theme = it
+                    onThemeChange(it)
+                },
+                onUpdateRate = {
+                    state.updateDefaults(data) { d -> d.copy(updateRateHz = d.updateRateHz.next(listOf(1, 2, 5, 10))) }
+                },
+                onAccuracy = {
+                    state.updateDefaults(data) { d -> d.copy(accuracyMeters = d.accuracyMeters.next(listOf(3f, 5f, 10f, 20f))) }
+                },
+                onUnits = { state.updateDefaults(data) { it.copy(metric = !it.metric) } },
+                onJoystickSize = { state.updateDefaults(data) { d -> d.copy(joystickSize = d.joystickSize.next(JoystickSize.entries)) } },
+                onFloatingJoystick = { on -> state.updateDefaults(data) { it.copy(floatingJoystick = on) } },
+            ),
+        )
+        Screen.ActivityLog -> ActivityLogScreen(
+            log = data.activityLog,
+            onBack = { state.back() },
+            onClear = data.onClearLog,
+        )
+        Screen.Service -> state.service?.let { endpoint ->
+            ServiceScreen(
+                state = ServiceUiState(
+                    endpoint = endpoint,
+                    url = state.serviceUrl,
+                    profile = state.serviceProfile,
+                    urlError = state.serviceUrlError,
+                    profileError = state.serviceProfileError,
+                ),
+                actions = ServiceActions(
+                    onBack = { state.back() },
+                    onUrlChange = { state.serviceUrl = it },
+                    onProfileChange = { state.serviceProfile = it },
+                    onReset = state::resetService,
+                    onSave = { state.saveService(data.onServiceSave) },
+                ),
+            )
+        }
+        Screen.Map -> Unit
+    }
+}
+
+/** The option after this one in [options] (wrapping; the first if this one isn't listed). */
+private fun <T> T.next(options: List<T>): T = options[(options.indexOf(this) + 1) % options.size]
 
 @Composable
 private fun Search(

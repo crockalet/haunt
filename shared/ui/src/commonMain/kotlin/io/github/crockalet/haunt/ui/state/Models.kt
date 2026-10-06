@@ -1,6 +1,7 @@
 package io.github.crockalet.haunt.ui.state
 
 import androidx.compose.runtime.Immutable
+import io.github.crockalet.haunt.ui.map.HauntMapStyle
 import androidx.compose.ui.graphics.Color
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
@@ -119,6 +120,14 @@ data class DetectedCoordinates(val position: LatLng, val format: String? = null,
 @Immutable
 data class Notice(val text: String, val hint: String? = null, val error: Boolean = true)
 
+/** Joystick pad sizes (diameter in dp); the knob scales with the pad. */
+enum class JoystickSize(val label: String, val dp: Float) {
+    Small("S", 112f),
+    Medium("M", 140f),
+    Large("L", 176f),
+    ExtraLarge("XL", 216f),
+}
+
 /** Default per-user settings shown in Settings → Defaults. */
 @Immutable
 data class HauntDefaults(
@@ -126,17 +135,24 @@ data class HauntDefaults(
     val accuracyMeters: Float = 5f,
     val metric: Boolean = true,
     val loop: LoopMode = LoopMode.Once,
+    val joystickSize: JoystickSize = JoystickSize.Medium,
+    /** Show the joystick over other apps while Haunt is in the background (Android). */
+    val floatingJoystick: Boolean = false,
+    /** Where the user dragged the in-app pad, in dp from its default spot (bottom-left). */
+    val joystickOffsetX: Float = 0f,
+    val joystickOffsetY: Float = 0f,
 )
 
-/** MapLibre style URLs; see https://openfreemap.org. */
+/** What the map draws: Haunt's own style (follows light / dark) or any MapLibre style URL. */
 @Immutable
-data class MapStyle(val lightUrl: String, val darkUrl: String) {
-    fun url(dark: Boolean) = if (dark) darkUrl else lightUrl
+sealed interface MapStyle {
+    /** [HauntMapStyle] over [tilesUrl], an OpenMapTiles-schema TileJSON (OpenFreeMap by default). */
+    data class Haunt(val tilesUrl: String = HauntMapStyle.OPENFREEMAP_TILES) : MapStyle
+
+    /** A MapLibre style JSON URL, used for both themes. */
+    data class Custom(val url: String) : MapStyle
 
     companion object {
-        val OpenFreeMap = MapStyle(
-            lightUrl = "https://tiles.openfreemap.org/styles/positron",
-            darkUrl = "https://tiles.openfreemap.org/styles/dark",
-        )
+        val Default: MapStyle = Haunt()
     }
 }

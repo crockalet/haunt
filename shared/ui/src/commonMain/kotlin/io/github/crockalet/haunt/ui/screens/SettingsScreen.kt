@@ -69,6 +69,8 @@ data class SettingsActions(
     val onUpdateRate: () -> Unit = {},
     val onAccuracy: () -> Unit = {},
     val onUnits: () -> Unit = {},
+    val onJoystickSize: () -> Unit = {},
+    val onFloatingJoystick: (Boolean) -> Unit = {},
 )
 
 /** Settings: ADB control + activity log, connect an agent, services, defaults. */
@@ -206,6 +208,23 @@ fun SettingsScreen(
                 DefaultRow("Accuracy", "±${state.defaults.accuracyMeters.toInt()} m", actions.onAccuracy)
                 RowDivider()
                 DefaultRow("Units", if (state.defaults.metric) "Metric" else "Imperial", actions.onUnits)
+            }
+        }
+
+        Column {
+            SectionHeader("Joystick")
+            ListGroup {
+                DefaultRow("Pad size", "${state.defaults.joystickSize.label} · ${state.defaults.joystickSize.dp.toInt()} dp", actions.onJoystickSize)
+                RowDivider()
+                ListRow(
+                    title = "Float over other apps",
+                    subtitle = "Shows the pad on top of other apps while joystick mode runs",
+                    minHeight = 58.dp,
+                    padding = ItemPadding,
+                    trailing = {
+                        Switch(state.defaults.floatingJoystick, actions.onFloatingJoystick, contentDescription = "Float over other apps")
+                    },
+                )
             }
         }
     }

@@ -22,6 +22,7 @@ import io.github.crockalet.haunt.protocol.Place
 import io.github.crockalet.haunt.ui.screens.OnboardingStep
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.RouteRequest
 import io.github.crockalet.haunt.ui.state.ServiceKind
@@ -109,14 +110,25 @@ class UiMappingTest {
 
     @Test
     fun settingsRoundTrip() {
-        val s = HauntSettings(updateIntervalMillis = 500, accuracyMeters = 10f, units = Units.Imperial, theme = ThemeMode.Dark)
+        val s = HauntSettings(
+            updateIntervalMillis = 500, accuracyMeters = 10f, units = Units.Imperial, theme = ThemeMode.Dark,
+            joystickSize = "ExtraLarge", floatingJoystick = true, joystickOffsetX = 12f, joystickOffsetY = -40f,
+        )
         val d = UiMapping.defaults(s, HauntDefaults(loop = LoopMode.Loop))
-        assertEquals(HauntDefaults(updateRateHz = 2, accuracyMeters = 10f, metric = false, loop = LoopMode.Loop), d)
+        assertEquals(
+            HauntDefaults(
+                updateRateHz = 2, accuracyMeters = 10f, metric = false, loop = LoopMode.Loop,
+                joystickSize = JoystickSize.ExtraLarge, floatingJoystick = true, joystickOffsetX = 12f, joystickOffsetY = -40f,
+            ),
+            d,
+        )
+        assertEquals(JoystickSize.Medium, UiMapping.joystickSize(HauntSettings(joystickSize = "huge")))
         assertEquals(s, UiMapping.applyDefaults(HauntSettings(theme = ThemeMode.Dark), d))
         assertEquals(ThemeMode.Dark, UiMapping.theme(UiMapping.theme(ThemeMode.Dark)))
-        assertEquals(MapStyle.OpenFreeMap, UiMapping.mapStyle(HauntSettings()))
+        assertEquals(MapStyle.Default, UiMapping.mapStyle(HauntSettings()))
+        assertEquals(MapStyle.Custom("https://tiles.example.org/s.json"), UiMapping.mapStyle(HauntSettings(mapStyleUrl = "https://tiles.example.org/s.json")))
         assertEquals("tiles.example.org", UiMapping.services(HauntSettings(mapStyleUrl = "https://tiles.example.org/style.json"))[0].url)
-        assertEquals(listOf("OpenFreeMap", "Photon", "OSRM demo · driving"), UiMapping.services(HauntSettings()).map { it.provider })
+        assertEquals(listOf("Haunt · OpenFreeMap", "Photon", "OSRM demo · driving"), UiMapping.services(HauntSettings()).map { it.provider })
     }
 
     @Test

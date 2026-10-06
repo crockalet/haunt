@@ -208,4 +208,53 @@ class HolderTest {
         val ui = buildMapUiState(HauntState.Idle, LocalUiState(mode = MapMode.Route, rate = 2))
         assertEquals("2×", assertNotNull(ui.route).rateLabel)
     }
+
+    // --- Locate button ----------------------------------------------------------------------
+
+    @Test
+    fun locateInPinModeHauntsMyLocation() {
+        val commands = RecordingCommands()
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Pin), commands = commands)
+        holder.locate { b }
+        assertEquals(listOf<Pair<LatLng, String?>>(b to MapStateHolder.MY_LOCATION_LABEL), commands.locations)
+        assertEquals(false, holder.local.locating)
+    }
+
+    @Test
+    fun locateInJoystickModeRestartsTheStickThere() {
+        val c = RecordingController()
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick))
+        holder.locate { b }
+        assertEquals(listOf("startJoystick"), c.calls)
+        assertEquals(b, holder.local.lastPosition)
+    }
+
+    @Test
+    fun locateInRouteModeBecomesTheFirstStopOnce() {
+        val far = LatLng(1.0, 1.0)
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route, draftRoute = listOf(far)))
+        holder.locate { a }
+        assertEquals(listOf(a, far), holder.local.draftRoute)
+        // Tapping again (a few metres away) doesn't add a duplicate start.
+        holder.locate { LatLng(0.0001, 0.0) }
+        assertEquals(listOf(a, far), holder.local.draftRoute)
+        assertEquals(LatLng(0.0001, 0.0), holder.local.cameraOverride)
+    }
+
+    @Test
+    fun locateWhileARoutePlaysOnlyMovesTheCamera() {
+        val holder = MapStateHolder(RecordingController(moving()), LocalUiState(mode = MapMode.Route, draftRoute = listOf(b)))
+        holder.locate { a }
+        assertEquals(listOf(b), holder.local.draftRoute)
+        assertEquals(a, holder.local.cameraOverride)
+    }
+
+    @Test
+    fun locateFailureShowsTheHint() {
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Pin))
+        holder.locate { throw CommandException("Haunt is faking your location right now", "Stop haunting first.") }
+        assertEquals(Notice("Haunt is faking your location right now", "Stop haunting first."), holder.notice)
+        assertEquals(false, holder.local.locating)
+        assertTrue(buildMapUiState(HauntState.Idle, holder.local).locating.not())
+    }
 }

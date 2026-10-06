@@ -42,7 +42,7 @@
 ### Backlog (not v1)
 A6 QS tile/widget · B5 realism (jitter, drift, acceleration) · B6 random wander · B7 teleport-safe travel ·
 B8 timeline scrubbing · C6 scenario files · C7 deep links / Tasker · D4 route library · D5 backup ·
-E3 floating overlay joystick · E4 real-vs-fake indicator · E5 tablet layouts · F1 profiles ·
+E4 real-vs-fake indicator · E5 tablet layouts · F1 profiles ·
 F2 locale/timezone hints · F3 fix logger · F4 desktop companion (also drives iOS/emulators) · G* root features.
 
 Dropped: on-device MCP/REST servers (C1, C4). All agent traffic goes over ADB.
@@ -261,7 +261,7 @@ Pluggable endpoints (Settings → Map & services):
 
 | Service | Default | Options |
 |---|---|---|
-| Map style | OpenFreeMap (no key) | any MapLibre style URL or raster XYZ template; satellite = user-provided URL |
+| Map style | Haunt's own light / dark style (`HauntMapStyle`, generated from the theme's map colours) over OpenFreeMap tiles (no key) | any MapLibre style URL (used for both themes); satellite = user-provided URL |
 | Search | Photon (komoot) | Photon URL, Nominatim URL (1 req/s, no autocomplete) |
 | Routing | OSRM public demo (fair use, attribution) | OSRM / Valhalla / GraphHopper URL + optional API key |
 
@@ -290,12 +290,27 @@ so it shares across platforms and is not tied to Material.
   (+ pause in Route mode) and an expand arrow, plus a separate round **Stop** button.
 - Expanding opens a glass details card above the toolbar (place, coordinates, altitude/accuracy/rate;
   route progress, speed presets, follow roads, loop mode; joystick speed).
-- Joystick mode: thumbstick floats over the map on the left.
+- Locate button (bottom-right): finds the device's **real** location and starts from it — Pin haunts it,
+  Joystick restarts the stick there, Route makes it the first stop. While Haunt is faking, all providers
+  return the fake position, so it uses the last real fix seen (≤ 30 min) or asks to stop haunting first.
+  Opening Haunt while idle centres the map on the real position.
+- Joystick mode: thumbstick over the map, bottom-left by default; drag the grip on its corner to move it
+  (position remembered). Pad size S / M / L / XL. Optional **floating joystick** (E3): with "Float over other
+  apps" on and the permission granted, the pad is drawn over other apps (`TYPE_APPLICATION_OVERLAY`, hosted
+  by `HauntService`) while joystick mode runs and Haunt is in the background; draggable, with an "open Haunt" button.
 
 **Search:** full-screen glass sheet over a blurred map; detects pasted coordinates ("Haunt here"), nearby places, recent.
 **Library:** Favourites (folders) · History · Tracks; import GPX / KML.
 **Settings:** ADB control + activity log · "Connect an AI agent" (`claude mcp add haunt -- haunt mcp`) ·
-map & service endpoints · defaults (theme, update rate, accuracy, units).
+map & service endpoints · defaults (theme, update rate, accuracy, units) · joystick (pad size, float over other apps).
+
+**Lifecycle:** backgrounding Haunt keeps faking (and the ADB socket) running; swiping it away from Recents
+stops faking, the floating joystick and both services (`onTaskRemoved`). The CLI restarts `ControlService` on its next call.
+
+**Motion:** everything uses three spring presets (`HauntMotion.smooth / snappy / bouncy`, after Morphlet's).
+The details card grows out of the toolbar and springs to fit its content; switching mode morphs the card;
+screens scale-and-fade; the search pill morphs into the search field (`Modifier.morph(key)`, shared bounds);
+buttons and chips have springy press feedback; the joystick knob springs back on release.
 **Onboarding:** enable developer options → select mock app (deep link to settings, live check) →
 location + notification permissions → done.
 

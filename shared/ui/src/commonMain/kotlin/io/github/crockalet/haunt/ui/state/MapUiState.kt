@@ -22,6 +22,8 @@ data class MapUiState(
     val route: RouteDetails?,
     val joystick: JoystickDetails?,
     val map: MapContent,
+    /** The locate button is waiting for a real fix. */
+    val locating: Boolean = false,
 )
 
 /** Content of the status chip under the search pill (collapsed state only). */
@@ -70,6 +72,11 @@ data class JoystickDetails(
     val directionLabel: String,
     val bearingDeg: Double,
     val magnitude: Double,
+    val size: JoystickSize = JoystickSize.Medium,
+    val floating: Boolean = false,
+    /** Pad offset from its default spot, in dp. */
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
 )
 
 /** What the map layer shows. */
@@ -115,6 +122,8 @@ data class LocalUiState(
     val lastPosition: LatLng? = null,
     /** Camera target set by "Show on map"; cleared when something is haunted. */
     val cameraOverride: LatLng? = null,
+    /** The locate button is waiting for the device's real location. */
+    val locating: Boolean = false,
 )
 
 fun LocalUiState.presetSpeed(): Speed = speedPreset.speed ?: customSpeed
@@ -192,6 +201,10 @@ fun buildMapUiState(
             directionLabel = Format.compass(heading),
             bearingDeg = local.joystickBearing,
             magnitude = local.joystickMagnitude,
+            size = defaults.joystickSize,
+            floating = defaults.floatingJoystick,
+            offsetX = defaults.joystickOffsetX,
+            offsetY = defaults.joystickOffsetY,
         )
     } else null
 
@@ -225,6 +238,7 @@ fun buildMapUiState(
         pin = pin,
         route = route,
         joystick = joystick,
+        locating = local.locating,
         map = MapContent(
             fix = position,
             accuracyMeters = fix?.accuracy,

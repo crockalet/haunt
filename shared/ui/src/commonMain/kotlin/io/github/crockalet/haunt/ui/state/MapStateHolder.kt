@@ -127,6 +127,49 @@ class MapStateHolder(
         launchCommand { commands.setLocation(position, defaults.accuracyMeters, label) }
     }
 
+    /**
+     * "Start from where I am": [position] is the device's real location. Pin mode haunts it; joystick
+     * mode restarts the stick from it; route mode makes it the first stop (unless it already is).
+     * While a route plays it only moves the camera.
+     */
+    fun useMyLocation(position: LatLng) {
+        when (local.mode) {
+            MapMode.Pin -> hauntAt(position, MY_LOCATION_LABEL)
+            MapMode.Joystick -> {
+                local = local.copy(cameraOverride = null, lastPosition = position)
+                controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = position)
+            }
+            MapMode.Route -> {
+                if (controller.state.value is HauntState.Moving) {
+                    showOnMap(position)
+                    return
+                }
+                val first = local.draftRoute.firstOrNull()
+                val draft = if (first != null && Geo.distance(first, position) < SAME_STOP_METERS) local.draftRoute else listOf(position) + local.draftRoute
+                local = local.copy(draftRoute = draft, draftName = null, draftTrack = null, cameraOverride = position)
+            }
+        }
+    }
+
+    /** Locate button: asks [locateMe] for the real location, then [useMyLocation]. Ignored while one is running. */
+    fun locate(locateMe: suspend () -> LatLng) {
+        if (local.locating) return
+        local = local.copy(locating = true)
+        scope.launch {
+            try {
+                val position = locateMe()
+                local = local.copy(locating = false)
+                useMyLocation(position)
+            } catch (e: CancellationException) {
+                local = local.copy(locating = false)
+                throw e
+            } catch (e: Exception) {
+                local = local.copy(locating = false)
+                showNotice(e.toNotice())
+            }
+        }
+    }
+
     /** Move the camera to [position] without haunting it. */
     fun showOnMap(position: LatLng) {
         local = local.copy(cameraOverride = position)
@@ -267,6 +310,12 @@ class MapStateHolder(
     companion object {
         /** Range of the Custom speed editor (km/h). */
         val CustomSpeedRangeKmh = 1f..150f
+
+        /** Label of the place set by the locate button. */
+        const val MY_LOCATION_LABEL = "My location"
+
+        /** A first stop closer than this to "my location" counts as already starting there. */
+        private const val SAME_STOP_METERS = 25.0
     }
 }
 
