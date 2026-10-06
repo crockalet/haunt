@@ -1,6 +1,7 @@
 package io.github.crockalet.haunt.ui.state
 
 import androidx.compose.runtime.Immutable
+import io.github.crockalet.haunt.ui.map.HauntMapStyle
 import androidx.compose.ui.graphics.Color
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
@@ -142,15 +143,16 @@ data class HauntDefaults(
     val joystickOffsetY: Float = 0f,
 )
 
-/** MapLibre style URLs; see https://openfreemap.org. */
+/** What the map draws: Haunt's own style (follows light / dark) or any MapLibre style URL. */
 @Immutable
-data class MapStyle(val lightUrl: String, val darkUrl: String) {
-    fun url(dark: Boolean) = if (dark) darkUrl else lightUrl
+sealed interface MapStyle {
+    /** [HauntMapStyle] over [tilesUrl], an OpenMapTiles-schema TileJSON (OpenFreeMap by default). */
+    data class Haunt(val tilesUrl: String = HauntMapStyle.OPENFREEMAP_TILES) : MapStyle
+
+    /** A MapLibre style JSON URL, used for both themes. */
+    data class Custom(val url: String) : MapStyle
 
     companion object {
-        val OpenFreeMap = MapStyle(
-            lightUrl = "https://tiles.openfreemap.org/styles/positron",
-            darkUrl = "https://tiles.openfreemap.org/styles/dark",
-        )
+        val Default: MapStyle = Haunt()
     }
 }

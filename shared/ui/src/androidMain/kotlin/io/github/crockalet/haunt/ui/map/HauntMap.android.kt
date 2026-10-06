@@ -12,6 +12,7 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.ui.components.LocationMarker
 import io.github.crockalet.haunt.ui.components.RouteEndpoint
 import io.github.crockalet.haunt.ui.state.MapContent
+import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraUpdate
@@ -46,7 +47,7 @@ private fun lineJson(points: List<LatLng>): String =
 @Composable
 actual fun HauntMap(
     content: MapContent,
-    styleUrl: String,
+    style: MapStyle,
     onLongPress: (LatLng) -> Unit,
     modifier: Modifier,
 ) {
@@ -57,8 +58,15 @@ actual fun HauntMap(
     val c = HauntTheme.colors
     val longPress by rememberUpdatedState(onLongPress)
     val start = remember { content.camera ?: LatLng(35.65952, 139.70055) }
+    // Haunt's style is generated from the theme, so it switches with light / dark.
+    val baseStyle = remember(style, c) {
+        when (style) {
+            is MapStyle.Haunt -> BaseStyle.Json(HauntMapStyle.json(c, style.tilesUrl))
+            is MapStyle.Custom -> BaseStyle.Uri(style.url)
+        }
+    }
     val mapState = rememberMapState(
-        baseStyle = BaseStyle.Uri(styleUrl),
+        baseStyle = baseStyle,
         initialCameraPosition = CameraPosition(target = start.toPosition(), zoom = 15.5),
     ) {
         val route = rememberGeoJsonSource(GeoJsonData.JsonString(lineJson(content.route)))

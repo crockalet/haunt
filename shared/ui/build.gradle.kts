@@ -35,6 +35,7 @@ kotlin {
             implementation(kotlin("test"))
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.kotlinx.serialization.json) // parses the generated map style
         }
     }
 }

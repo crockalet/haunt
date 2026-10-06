@@ -4,10 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.ui.state.MapContent
+import io.github.crockalet.haunt.ui.state.MapStyle
 
 /**
- * The map behind everything. Android renders MapLibre ([styleUrl] is a MapLibre style JSON URL,
- * OpenFreeMap by default); other targets draw [DrawnMap], an illustrative stand-in.
+ * The map behind everything. Android renders MapLibre with [style] (Haunt's own style from the theme's
+ * map colours by default, see [HauntMapStyle]); other targets draw [DrawnMap], an illustrative stand-in.
  *
  * Shows the ghost marker + accuracy halo at [MapContent.fix], the route polyline and joystick
  * trail, and reports long-presses via [onLongPress].
@@ -15,7 +16,7 @@ import io.github.crockalet.haunt.ui.state.MapContent
 @Composable
 expect fun HauntMap(
     content: MapContent,
-    styleUrl: String,
+    style: MapStyle,
     onLongPress: (LatLng) -> Unit,
     modifier: Modifier = Modifier,
 )

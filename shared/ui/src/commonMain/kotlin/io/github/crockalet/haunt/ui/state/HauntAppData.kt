@@ -2,6 +2,7 @@ package io.github.crockalet.haunt.ui.state
 
 import androidx.compose.runtime.Immutable
 import io.github.crockalet.haunt.core.LatLng
+import io.github.crockalet.haunt.ui.map.HauntMapStyle
 import io.github.crockalet.haunt.ui.theme.FolderColors
 
 /**
@@ -43,7 +44,7 @@ data class HauntAppData(
 ) {
     companion object {
         val DefaultServices = listOf(
-            ServiceEndpoint("Map style", "OpenFreeMap", "tiles.openfreemap.org", ServiceKind.MapStyle, "https://tiles.openfreemap.org/styles/liberty"),
+            ServiceEndpoint("Map style", "Haunt · OpenFreeMap", "tiles.openfreemap.org", ServiceKind.MapStyle, HauntMapStyle.OPENFREEMAP_TILES),
             ServiceEndpoint("Place search", "Photon", "photon.komoot.io", ServiceKind.Search, "https://photon.komoot.io"),
             ServiceEndpoint("Routing", "OSRM demo", "router.project-osrm.org", ServiceKind.Routing, "https://router.project-osrm.org", profile = "driving"),
         )

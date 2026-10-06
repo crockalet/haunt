@@ -31,7 +31,7 @@ data class HauntSettings(
     val routingUrl: String = DEFAULT_ROUTING_URL,
     /** OSRM profile segment, e.g. "driving", "foot", "bike" (the public demo only serves driving). */
     val routingProfile: String = DEFAULT_ROUTING_PROFILE,
-    /** MapLibre style URL for the map (used by the UI). */
+    /** The map: [DEFAULT_MAP_STYLE_URL] = Haunt's own style over OpenFreeMap; anything else is a MapLibre style URL. */
     val mapStyleUrl: String = DEFAULT_MAP_STYLE_URL,
     /** Joystick pad size: a `JoystickSize` name from the shared UI (S / M / L / XL). */
     val joystickSize: String = DEFAULT_JOYSTICK_SIZE,
@@ -50,7 +50,10 @@ data class HauntSettings(
         const val DEFAULT_SEARCH_URL = "https://photon.komoot.io"
         const val DEFAULT_ROUTING_URL = "https://router.project-osrm.org"
         const val DEFAULT_ROUTING_PROFILE = "driving"
-        const val DEFAULT_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+        /** OpenFreeMap's tiles, drawn with Haunt's own style (`HauntMapStyle`). */
+        const val DEFAULT_MAP_STYLE_URL = "https://tiles.openfreemap.org/planet"
+        /** Default before Haunt had its own style; read as [DEFAULT_MAP_STYLE_URL]. */
+        const val LEGACY_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
         const val DEFAULT_JOYSTICK_SIZE = "Medium"
         const val MIN_UPDATE_INTERVAL_MILLIS = 100L
         const val MAX_UPDATE_INTERVAL_MILLIS = 10_000L
@@ -92,7 +95,8 @@ object SettingsKeys {
             searchUrl = store.getString(SEARCH_URL)?.trim()?.takeIf { it.isNotEmpty() } ?: d.searchUrl,
             routingUrl = store.getString(ROUTING_URL)?.trim()?.takeIf { it.isNotEmpty() } ?: d.routingUrl,
             routingProfile = store.getString(ROUTING_PROFILE)?.trim()?.takeIf { it.isNotEmpty() } ?: d.routingProfile,
-            mapStyleUrl = store.getString(MAP_STYLE_URL)?.trim()?.takeIf { it.isNotEmpty() } ?: d.mapStyleUrl,
+            mapStyleUrl = store.getString(MAP_STYLE_URL)?.trim()?.takeIf { it.isNotEmpty() && it != HauntSettings.LEGACY_MAP_STYLE_URL }
+                ?: d.mapStyleUrl,
             joystickSize = store.getString(JOYSTICK_SIZE)?.trim()?.takeIf { it.isNotEmpty() } ?: d.joystickSize,
             floatingJoystick = store.getBoolean(FLOATING_JOYSTICK, d.floatingJoystick),
             joystickOffsetX = store.getFloat(JOYSTICK_OFFSET_X, d.joystickOffsetX).takeIf { it.isFinite() } ?: d.joystickOffsetX,

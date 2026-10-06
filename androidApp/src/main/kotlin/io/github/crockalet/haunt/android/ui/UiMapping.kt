@@ -140,7 +140,7 @@ object UiMapping {
     fun services(s: HauntSettings): List<ServiceEndpoint> = listOf(
         ServiceEndpoint(
             "Map style",
-            if (s.mapStyleUrl == HauntSettings.DEFAULT_MAP_STYLE_URL) "OpenFreeMap" else "Custom",
+            if (s.mapStyleUrl == HauntSettings.DEFAULT_MAP_STYLE_URL) "Haunt · OpenFreeMap" else "Custom",
             host(s.mapStyleUrl),
             ServiceKind.MapStyle,
             s.mapStyleUrl,
@@ -175,9 +175,9 @@ object UiMapping {
 
     private fun host(url: String): String = runCatching { URI(url.trim()).host }.getOrNull() ?: url.trim()
 
-    /** The default style follows the theme (OpenFreeMap light / dark); a custom URL is used for both. */
+    /** The default is Haunt's own style (follows the theme); a custom URL is used for both themes. */
     fun mapStyle(s: HauntSettings): MapStyle =
-        if (s.mapStyleUrl == HauntSettings.DEFAULT_MAP_STYLE_URL) MapStyle.OpenFreeMap else MapStyle(s.mapStyleUrl, s.mapStyleUrl)
+        if (s.mapStyleUrl == HauntSettings.DEFAULT_MAP_STYLE_URL) MapStyle.Default else MapStyle.Custom(s.mapStyleUrl)
 
     fun theme(t: SettingsTheme): UiTheme = when (t) {
         SettingsTheme.System -> UiTheme.System

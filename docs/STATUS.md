@@ -28,9 +28,11 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
    - Floating joystick: permission flow, shows only in the background in joystick mode, steering works over
      another app (e.g. Google Maps), grip drag moves the window smoothly and the spot survives rotation, "open
      Haunt" button. In-app pad grip drag + clamping, all four pad sizes. Morph/spring animations feel right on device.
+   - Map style: Haunt light / dark style loads (glyphs + tiles from OpenFreeMap), switches with the theme,
+     custom style URL in Settings → Map style still works.
    - Locate button: real fix when idle (Pin / Joystick / Route behaviours), cached fix or hint while faking, map
      opens on the real position. Swiping Haunt from Recents stops faking, the notification and both services.
-2. **Gaps to close**: custom muted MapLibre style matching the mockups (currently stock OpenFreeMap positron/dark); OSRM public demo only serves `driving` (walking routes follow car roads unless the user points Settings → Routing at a server with a `foot` profile; consider defaulting walk/cycle routes to a public foot/bike server, or a Valhalla backend). Done 2026-10-06: service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
+2. **Gaps to close**: OSRM public demo only serves `driving` (walking routes follow car roads unless the user points Settings → Routing at a server with a `foot` profile; consider defaulting walk/cycle routes to a public foot/bike server, or a Valhalla backend). Done 2026-10-06: Haunt's own map style (`HauntMapStyle`: light / dark from the theme palette over OpenFreeMap tiles, no icons; previews `docs/screenshots/14-map-style-*.png` rendered with MapLibre GL JS), service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
 3. **Release prep (M5)**: release signing, F-Droid metadata, Play listing "Haunt: Fake GPS Location" (Play may ask about the `specialUse` FGS), CLI distribution (fat JAR now; consider GraalVM native image / Homebrew).
 4. Backlog features: see `docs/DESIGN.md` §1 (QS tile, realism/jitter, scenario files, desktop companion for iOS, …).
 
@@ -48,6 +50,7 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
 | Application ID `io.github.crockalet.haunt` is final | Confirmed by the user 2026-10-06; it can't change after publishing. |
 | Animations: Compose built-ins (shared bounds, `AnimatedContent`, springs), no library | Morphlet (user's reference) is React Native; Compose has the same primitives. |
 | Floating joystick via `SYSTEM_ALERT_WINDOW` overlay, opt-in | Joystick must work while another app is in front; only asked for when the user turns it on. |
+| Map style generated in code (`HauntMapStyle`) from the theme's map colours, not a hosted style | Real map matches the drawn one and the glass UI, follows light / dark, no style server to host; any OpenMapTiles TileJSON works. |
 | Fonts: Plus Jakarta Sans (UI), JetBrains Mono (data) | Bundled, OFL. |
 
 ## Design references

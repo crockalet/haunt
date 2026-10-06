@@ -45,6 +45,12 @@ class SettingsTest {
     }
 
     @Test
+    fun oldDefaultMapStyleBecomesHauntStyle() {
+        val store = InMemoryKeyValueStore(mapOf(SettingsKeys.MAP_STYLE_URL to HauntSettings.LEGACY_MAP_STYLE_URL))
+        assertEquals(HauntSettings.DEFAULT_MAP_STYLE_URL, SettingsKeys.read(store).mapStyleUrl)
+    }
+
+    @Test
     fun invalidValuesFallBackToDefaults() {
         val store = InMemoryKeyValueStore(
             mapOf(

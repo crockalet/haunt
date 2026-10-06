@@ -261,7 +261,7 @@ Pluggable endpoints (Settings → Map & services):
 
 | Service | Default | Options |
 |---|---|---|
-| Map style | OpenFreeMap (no key) | any MapLibre style URL or raster XYZ template; satellite = user-provided URL |
+| Map style | Haunt's own light / dark style (`HauntMapStyle`, generated from the theme's map colours) over OpenFreeMap tiles (no key) | any MapLibre style URL (used for both themes); satellite = user-provided URL |
 | Search | Photon (komoot) | Photon URL, Nominatim URL (1 req/s, no autocomplete) |
 | Routing | OSRM public demo (fair use, attribution) | OSRM / Valhalla / GraphHopper URL + optional API key |
 

@@ -85,7 +85,7 @@ import kotlinx.coroutines.delay
  *
  * @param controller engine; the UI only reads [HauntController.state] and calls its commands.
  * @param data app-provided lists and hooks (favourites, agent status…).
- * @param mapStyle MapLibre style URLs (light/dark). OpenFreeMap by default.
+ * @param mapStyle what the map draws; Haunt's own light / dark style over OpenFreeMap by default.
  * @param parseCoordinates turns pasted text into coordinates; the app passes [detectCoordinates] with
  *   a reference point for short plus codes.
  * @param onThemeChange persist the theme override chosen in Settings.
@@ -97,7 +97,7 @@ fun HauntApp(
     controller: HauntController,
     modifier: Modifier = Modifier,
     data: HauntAppData = HauntAppData(),
-    mapStyle: MapStyle = MapStyle.OpenFreeMap,
+    mapStyle: MapStyle = MapStyle.Default,
     parseCoordinates: (String) -> DetectedCoordinates? = { detectCoordinates(it) },
     state: HauntAppState = rememberHauntAppState(controller),
     onThemeChange: (ThemeMode) -> Unit = {},
@@ -115,7 +115,7 @@ fun HauntApp(
             Box(modifier.fillMaxSize().background(colors.map)) {
                 HauntMap(
                     content = ui.map,
-                    styleUrl = mapStyle.url(colors.isDark),
+                    style = mapStyle,
                     onLongPress = holder::onMapLongPress,
                     modifier = Modifier.fillMaxSize().hazeSource(haze),
                 )

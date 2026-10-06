@@ -125,9 +125,10 @@ class UiMappingTest {
         assertEquals(JoystickSize.Medium, UiMapping.joystickSize(HauntSettings(joystickSize = "huge")))
         assertEquals(s, UiMapping.applyDefaults(HauntSettings(theme = ThemeMode.Dark), d))
         assertEquals(ThemeMode.Dark, UiMapping.theme(UiMapping.theme(ThemeMode.Dark)))
-        assertEquals(MapStyle.OpenFreeMap, UiMapping.mapStyle(HauntSettings()))
+        assertEquals(MapStyle.Default, UiMapping.mapStyle(HauntSettings()))
+        assertEquals(MapStyle.Custom("https://tiles.example.org/s.json"), UiMapping.mapStyle(HauntSettings(mapStyleUrl = "https://tiles.example.org/s.json")))
         assertEquals("tiles.example.org", UiMapping.services(HauntSettings(mapStyleUrl = "https://tiles.example.org/style.json"))[0].url)
-        assertEquals(listOf("OpenFreeMap", "Photon", "OSRM demo · driving"), UiMapping.services(HauntSettings()).map { it.provider })
+        assertEquals(listOf("Haunt · OpenFreeMap", "Photon", "OSRM demo · driving"), UiMapping.services(HauntSettings()).map { it.provider })
     }
 
     @Test
