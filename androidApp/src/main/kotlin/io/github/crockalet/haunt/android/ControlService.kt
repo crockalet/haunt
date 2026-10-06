@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.minutes
  *
  * It calls `startForeground` immediately (type `specialUse` on API 34+, sharing [HauntService]'s
  * notification), keeps running while clients are connected or mocking is active, and stops itself
- * after [IDLE_TIMEOUT] otherwise. When "Allow ADB control" is off the socket still accepts, but every
+ * after [IDLE_TIMEOUT] otherwise, or as soon as Haunt is swiped away from Recents. When "Allow ADB control" is off the socket still accepts, but every
  * call fails with ADB_CONTROL_DISABLED so the CLI can show the hint.
  */
 class ControlService : Service() {
@@ -73,6 +73,17 @@ class ControlService : Service() {
             // Keep serving anyway: the process may live long enough for the CLI's call.
             Log.w(TAG, "startForeground failed", e)
         }
+    }
+
+    /**
+     * Haunt was swiped away from Recents: close the socket too. The CLI restarts this service on its
+     * next call, so agents keep working; it just doesn't linger after the user closed the app.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.i(TAG, "App closed from Recents; stopping")
+        if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

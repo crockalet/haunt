@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 /**
  * Foreground service (type `location`) that runs while Haunt is mocking: it keeps the process alive
  * and shows the ongoing notification (place / coordinates, mode, Pause/Resume/Stop). It stops itself
- * as soon as the controller goes Idle.
+ * as soon as the controller goes Idle, and stops mocking when Haunt is swiped away from Recents.
  *
  * Fixes are pushed to the platform by the runtime's [io.github.crockalet.haunt.android.inject.InjectionPipeline]
  * (started the moment mocking starts), so injection never waits for, or depends on, this service.
@@ -87,6 +87,14 @@ class HauntService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
         }
         stopSelf()
+    }
+
+    /** Haunt was swiped away from Recents: closing the app ends the session (backgrounding doesn't). */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.i(TAG, "App closed from Recents; stopping")
+        runtime.stopMocking()
+        shutdown()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
