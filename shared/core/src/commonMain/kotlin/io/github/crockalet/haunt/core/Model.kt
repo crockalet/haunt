@@ -24,6 +24,8 @@ data class Route(
     /** Per-point timestamps from a recorded track (GPX); null for drawn routes. */
     val timestampsMillis: List<Long>? = null,
     val name: String? = null,
+    /** Per-point altitudes in metres (GPX `ele`, KML third coordinate); null when unknown. */
+    val altitudes: List<Double>? = null,
 )
 
 @Serializable
@@ -68,6 +70,11 @@ sealed interface HauntState {
         val speed: Speed,
         val loop: LoopMode,
         val paused: Boolean,
+        /**
+         * Non-null while a recorded track is replayed by its timestamps: the multiplier applied to
+         * the recorded timing (1.0 = real time). Null for constant-speed playback.
+         */
+        val playbackRate: Double? = null,
     ) : HauntState
 
     /** Driven by the on-screen joystick. */
@@ -77,6 +84,7 @@ sealed interface HauntState {
         val maxSpeed: Speed,
         val headingDeg: Double,
         val distanceMeters: Double,
+        val paused: Boolean = false,
     ) : HauntState
 }
 
