@@ -10,12 +10,26 @@ import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.SampleData
 import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.theme.ThemeMode
+import javax.swing.SwingUtilities
 import kotlin.test.Test
 
-/** Drives real screen changes frame by frame: every transition must run to the end without crashing. */
+/**
+ * Drives real screen changes frame by frame: every transition must run to the end without crashing.
+ *
+ * Runs on the AWT event thread, where Compose desktop dispatches its own deferred work: driving the
+ * scene from the test thread races with it whenever a frame takes over 16 ms (slow CI machines),
+ * corrupting Compose's layout-rect index ("LayoutNode not found in RectList"). Android runs both on
+ * the main thread, so this matches the app.
+ */
 class TransitionsTest {
     @Test
     fun navigatingEveryScreenDoesNotCrash() {
+        var failure: Throwable? = null
+        SwingUtilities.invokeAndWait { failure = runCatching { navigateEverywhere() }.exceptionOrNull() }
+        failure?.let { throw it }
+    }
+
+    private fun navigateEverywhere() {
         val t0 = 1_760_000_000_000L
         val controller = FakeHauntController(
             HauntState.Holding(Fix(SampleData.ShibuyaCrossing, accuracy = 5f, timeMillis = t0), "Shibuya Crossing"),
