@@ -21,7 +21,7 @@ data class HauntSettings(
     val accuracyMeters: Float = 5f,
     /** Default altitude (metres) when neither the command nor the route gives one; null = none. */
     val altitudeMeters: Double? = null,
-    /** Fix rate. Applied when the process starts (the movement engine's tick is fixed per process). */
+    /** Time between fixes; applied live. */
     val updateIntervalMillis: Long = 1000L,
     val units: Units = Units.Metric,
     val theme: ThemeMode = ThemeMode.System,

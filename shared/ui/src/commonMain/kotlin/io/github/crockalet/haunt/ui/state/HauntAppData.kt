@@ -30,16 +30,17 @@ data class HauntAppData(
     val services: List<ServiceEndpoint> = DefaultServices,
     val onImportTrack: () -> Unit = {},
     val onSaveFavourite: (Place) -> Unit = {},
-    val onServiceClick: (ServiceEndpoint) -> Unit = {},
-    val onSeeAllLog: () -> Unit = {},
+    /** Settings → service editor saved: new URL and, for routing, profile (both trimmed and validated). */
+    val onServiceSave: (ServiceKind, url: String, profile: String?) -> Unit = { _, _, _ -> },
+    val onClearLog: () -> Unit = {},
     /** Settings → Defaults changed (update rate, accuracy, units); persist them. */
     val onDefaultsChange: (HauntDefaults) -> Unit = {},
 ) {
     companion object {
         val DefaultServices = listOf(
-            ServiceEndpoint("Map style", "OpenFreeMap", "tiles.openfreemap.org"),
-            ServiceEndpoint("Place search", "Photon", "photon.komoot.io"),
-            ServiceEndpoint("Routing", "OSRM demo", "router.project-osrm.org"),
+            ServiceEndpoint("Map style", "OpenFreeMap", "tiles.openfreemap.org", ServiceKind.MapStyle, "https://tiles.openfreemap.org/styles/liberty"),
+            ServiceEndpoint("Place search", "Photon", "photon.komoot.io", ServiceKind.Search, "https://photon.komoot.io"),
+            ServiceEndpoint("Routing", "OSRM demo", "router.project-osrm.org", ServiceKind.Routing, "https://router.project-osrm.org", profile = "driving"),
         )
 
         /** Sample content from the mockups. */
@@ -98,6 +99,7 @@ object SampleData {
     val log = listOf(
         LogEntry("14:06", "play_route Shibuya → Yoyogi"),
         LogEntry("14:04", "search_place \"Yoyogi Park\""),
+        LogEntry("14:03", "set_location lat=91.0, lng=139.7", ok = false, detail = "Latitude must be between -90 and 90"),
         LogEntry("14:02", "set_location 35.6595,139.7006"),
         LogEntry("14:01", "hello protocol=1"),
     )

@@ -9,7 +9,7 @@
 | Play Store title | **Haunt: Fake GPS Location** (or "Haunt Fake GPS") |
 | Launcher label | Haunt |
 | CLI | `haunt` |
-| Application ID | `io.github.crockalet.haunt` (placeholder — change before first release; it can't change after) |
+| Application ID | `io.github.crockalet.haunt` |
 | License | GPL-3.0-or-later |
 | Min SDK | 26 (Android 8.0) · Target: latest stable |
 

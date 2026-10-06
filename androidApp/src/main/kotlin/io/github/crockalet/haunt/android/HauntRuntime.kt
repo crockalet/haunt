@@ -193,9 +193,12 @@ class HauntRuntime internal constructor(context: Context) {
     private val foregroundServices = MutableStateFlow(0)
 
     init {
-        // Live-apply accuracy/altitude defaults.
+        // Live-apply accuracy/altitude defaults and the update rate.
         scope.launch {
             settings.map { it.defaults }.distinctUntilChanged().collect { engine.defaults = it }
+        }
+        scope.launch {
+            settings.map { it.updateIntervalMillis }.distinctUntilChanged().collect { engine.tickInterval = it.milliseconds }
         }
         // Whatever starts mocking (UI, socket, broadcast), keep the foreground service running.
         scope.launch {

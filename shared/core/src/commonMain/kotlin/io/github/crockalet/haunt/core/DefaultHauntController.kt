@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.updateAndGet
@@ -23,6 +24,7 @@ import kotlin.time.Duration.Companion.seconds
  *
  * - While not [HauntState.Idle], a [Fix] with a fresh `timeMillis` is emitted on [fixes] every
  *   [tickInterval] (immediately on each mode change, then once per tick), even when stationary.
+ *   [tickInterval] can be changed at any time; the new rate applies at once.
  * - Movement is integrated from the monotonic time actually elapsed (via [clock]), so a late tick
  *   doesn't slow a route down. Commands first settle movement up to "now" before applying.
  * - Thread-safety: all state lives in one immutable snapshot swapped by compare-and-set, so every
@@ -34,7 +36,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 class DefaultHauntController(
     scope: CoroutineScope,
-    val tickInterval: Duration = 1.seconds,
+    tickInterval: Duration = 1.seconds,
     private val clock: HauntClock = HauntClock.System,
     defaults: HauntDefaults = HauntDefaults(),
 ) : HauntController {
@@ -56,6 +58,7 @@ class DefaultHauntController(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
     private val _defaults = MutableStateFlow(defaults)
+    private val _tickInterval = MutableStateFlow(tickInterval.also { require(it.isPositive()) { "tickInterval must be positive" } })
 
     override val state: StateFlow<HauntState> = _state.asStateFlow()
     override val fixes: SharedFlow<Fix> = _fixes.asSharedFlow()
@@ -74,18 +77,25 @@ class DefaultHauntController(
      */
     val playbackRate: Double get() = core.value.playbackRate
 
+    /** Time between fixes. Changing it restarts the tick phase: a fix goes out at once, then one per new interval. */
+    var tickInterval: Duration
+        get() = _tickInterval.value
+        set(value) {
+            require(value.isPositive()) { "tickInterval must be positive" }
+            _tickInterval.value = value
+        }
+
     init {
-        require(tickInterval.isPositive()) { "tickInterval must be positive" }
         scope.launch {
-            core.map { it.session to (it.mode != Mode.Idle) }
-                .distinctUntilChanged()
-                .collectLatest { (_, active) ->
-                    if (!active) return@collectLatest
-                    while (true) {
-                        tick()
-                        delay(tickInterval)
-                    }
+            combine(core.map { it.session to (it.mode != Mode.Idle) }.distinctUntilChanged(), _tickInterval) { (_, active), interval ->
+                active to interval
+            }.collectLatest { (active, interval) ->
+                if (!active) return@collectLatest
+                while (true) {
+                    tick()
+                    delay(interval)
                 }
+            }
         }
     }
 
