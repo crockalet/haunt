@@ -20,6 +20,7 @@ import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.SampleData
+import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.state.SpeedPreset
 import io.github.crockalet.haunt.ui.theme.ThemeMode
 import org.jetbrains.skia.EncodedImageFormat
@@ -152,6 +153,17 @@ class Screenshots {
     @Test
     fun settings() {
         shot("09-settings", height = 1000) { App(it, holding, pinLocal, Screen.Settings) }
+    }
+
+    @Test
+    fun settingsDetails() {
+        shot("12-activity-log") { App(it, holding, pinLocal, Screen.ActivityLog) }
+        shot("13-service-routing") {
+            App(it, holding, pinLocal, Screen.Settings) { s ->
+                s.editService(HauntAppData.DefaultServices.single { e -> e.kind == ServiceKind.Routing })
+                s.serviceProfile = "foot"
+            }
+        }
     }
 
     @Test

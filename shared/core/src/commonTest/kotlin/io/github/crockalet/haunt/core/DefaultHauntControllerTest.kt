@@ -86,6 +86,21 @@ class DefaultHauntControllerTest {
     }
 
     @Test
+    fun tickIntervalChangesLive() = runTest {
+        val h = harness()
+        h.controller.setLocation(origin)
+        advance(2.seconds)
+        assertEquals(listOf(0L, 1000L, 2000L), h.fixes.map { it.timeMillis - epoch })
+        h.controller.tickInterval = 250.milliseconds
+        runCurrent()
+        advance(500.milliseconds)
+        // A fix at once on the change, then one per new interval.
+        assertEquals(listOf(0L, 1000L, 2000L, 2000L, 2250L, 2500L), h.fixes.map { it.timeMillis - epoch })
+        assertFailsWith<IllegalArgumentException> { h.controller.tickInterval = Duration.ZERO }
+        assertEquals(250.milliseconds, h.controller.tickInterval)
+    }
+
+    @Test
     fun defaultsApplyWhenNotGiven() = runTest {
         val h = harness(defaults = HauntDefaults(accuracy = 12f, altitude = 7.0))
         h.controller.setLocation(origin)

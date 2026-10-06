@@ -19,10 +19,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapStateHolder
+import io.github.crockalet.haunt.ui.state.ServiceEndpoint
+import io.github.crockalet.haunt.ui.state.ServiceKind
+import io.github.crockalet.haunt.ui.state.ServiceValidation
 import io.github.crockalet.haunt.ui.theme.ThemeMode
 
-/** Top-level destinations. The map is always underneath; the others are glass sheets over it. */
-enum class Screen { Map, Search, Library, Settings }
+/**
+ * Destinations. The map is always underneath; the others are glass sheets over it.
+ * [ActivityLog] and [Service] are opened from Settings and go back to it.
+ */
+enum class Screen { Map, Search, Library, Settings, ActivityLog, Service }
 
 /**
  * App-level UI state: navigation, theme override, per-screen UI state and the map presenter.
@@ -52,9 +58,45 @@ class HauntAppState(
     var libraryTab by mutableStateOf(initialLibraryTab)
     var libraryFolder by mutableStateOf<String?>(null)
 
+    /** The endpoint being edited on [Screen.Service], with the draft URL / profile. */
+    var service by mutableStateOf<ServiceEndpoint?>(null)
+        private set
+    var serviceUrl by mutableStateOf("")
+    var serviceProfile by mutableStateOf("")
+
     fun navigate(to: Screen) {
         if (to == Screen.Search) searchQuery = ""
         screen = to
+    }
+
+    /** Opens the editor for [endpoint] (display-only rows without a kind are ignored). */
+    fun editService(endpoint: ServiceEndpoint) {
+        if (endpoint.kind == null) return
+        service = endpoint
+        serviceUrl = endpoint.value
+        serviceProfile = endpoint.profile.orEmpty()
+        screen = Screen.Service
+    }
+
+    /** Draft URL / profile errors; both null when the draft can be saved. */
+    val serviceUrlError: String? get() = ServiceValidation.urlError(serviceUrl)
+    val serviceProfileError: String? get() = if (service?.profile != null) ServiceValidation.profileError(serviceProfile) else null
+
+    /** Validates the draft and, if valid, hands it to [save] and returns to Settings. Returns whether it saved. */
+    fun saveService(save: (ServiceKind, url: String, profile: String?) -> Unit): Boolean {
+        val endpoint = service ?: return false
+        val kind = endpoint.kind ?: return false
+        if (serviceUrlError != null || serviceProfileError != null) return false
+        save(kind, serviceUrl.trim(), if (endpoint.profile != null) serviceProfile.trim() else null)
+        screen = Screen.Settings
+        return true
+    }
+
+    /** Puts the defaults back into the draft (saved only on [saveService]). */
+    fun resetService() {
+        val endpoint = service ?: return
+        serviceUrl = endpoint.defaultValue
+        endpoint.defaultProfile?.let { serviceProfile = it }
     }
 
     /** Returns true when back was handled (i.e. we weren't on the map). */
@@ -66,7 +108,7 @@ class HauntAppState(
             }
             return false
         }
-        screen = Screen.Map
+        screen = if (screen == Screen.ActivityLog || screen == Screen.Service) Screen.Settings else Screen.Map
         return true
     }
 }

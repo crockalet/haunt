@@ -11,11 +11,18 @@ import io.github.crockalet.haunt.ui.components.Text
 import io.github.crockalet.haunt.ui.icons.HauntIcons
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 
-/** Back button + large title (Library, Settings). */
+/** Back button + large title (Library, Settings), with optional [trailing] actions on the right. */
 @Composable
-internal fun ScreenHeader(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ScreenHeader(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    backDescription: String = "Back to map",
+    trailing: (@Composable () -> Unit)? = null,
+) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        GlassIconButton(HauntIcons.Back, "Back to map", onBack)
-        Text(title, style = HauntTheme.type.display)
+        GlassIconButton(HauntIcons.Back, backDescription, onBack)
+        Text(title, Modifier.weight(1f), style = HauntTheme.type.display, maxLines = 1)
+        trailing?.invoke()
     }
 }

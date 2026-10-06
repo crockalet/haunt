@@ -186,6 +186,8 @@ class MainActivity : ComponentActivity() {
             onImportTrack = { importLauncher.launch(arrayOf("*/*")) },
             onSaveFavourite = { place -> saveFavourite(place.name, place.position) },
             onDefaultsChange = { d -> runtime.updateSettings { UiMapping.applyDefaults(it, d) } },
+            onServiceSave = { kind, url, profile -> runtime.updateSettings { UiMapping.applyService(it, kind, url, profile) } },
+            onClearLog = runtime.activityLog::clear,
         )
 
         HauntApp(

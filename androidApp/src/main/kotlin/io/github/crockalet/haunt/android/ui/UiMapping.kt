@@ -18,6 +18,7 @@ import io.github.crockalet.haunt.ui.state.LogEntry
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.Place
 import io.github.crockalet.haunt.ui.state.ServiceEndpoint
+import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.state.Track
 import io.github.crockalet.haunt.ui.theme.FolderColors
 import java.net.URI
@@ -104,7 +105,12 @@ object UiMapping {
     fun log(entries: List<ActivityEntry>, zone: ZoneId): List<LogEntry> =
         entries.asReversed().map { e ->
             val text = listOf(e.method, e.summary).filter { it.isNotBlank() }.joinToString(" ")
-            LogEntry(clock(e.timeMillis, zone), if (e.source == ActivitySource.Broadcast) "$text (broadcast)" else text, e.ok)
+            LogEntry(
+                clock(e.timeMillis, zone),
+                if (e.source == ActivitySource.Broadcast) "$text (broadcast)" else text,
+                e.ok,
+                e.errorMessage?.takeIf { it.isNotBlank() },
+            )
         }
 
     /**
@@ -131,14 +137,40 @@ object UiMapping {
     // --- settings -----------------------------------------------------------------------------
 
     fun services(s: HauntSettings): List<ServiceEndpoint> = listOf(
-        ServiceEndpoint("Map style", if (s.mapStyleUrl == HauntSettings.DEFAULT_MAP_STYLE_URL) "OpenFreeMap" else "Custom", host(s.mapStyleUrl)),
-        ServiceEndpoint("Place search", if (s.searchUrl == HauntSettings.DEFAULT_SEARCH_URL) "Photon" else "Photon (custom)", host(s.searchUrl)),
+        ServiceEndpoint(
+            "Map style",
+            if (s.mapStyleUrl == HauntSettings.DEFAULT_MAP_STYLE_URL) "OpenFreeMap" else "Custom",
+            host(s.mapStyleUrl),
+            ServiceKind.MapStyle,
+            s.mapStyleUrl,
+            HauntSettings.DEFAULT_MAP_STYLE_URL,
+        ),
+        ServiceEndpoint(
+            "Place search",
+            if (s.searchUrl == HauntSettings.DEFAULT_SEARCH_URL) "Photon" else "Photon (custom)",
+            host(s.searchUrl),
+            ServiceKind.Search,
+            s.searchUrl,
+            HauntSettings.DEFAULT_SEARCH_URL,
+        ),
         ServiceEndpoint(
             "Routing",
-            if (s.routingUrl == HauntSettings.DEFAULT_ROUTING_URL) "OSRM demo" else "OSRM (custom)",
+            (if (s.routingUrl == HauntSettings.DEFAULT_ROUTING_URL) "OSRM demo" else "OSRM (custom)") + " · ${s.routingProfile}",
             host(s.routingUrl),
+            ServiceKind.Routing,
+            s.routingUrl,
+            HauntSettings.DEFAULT_ROUTING_URL,
+            profile = s.routingProfile,
+            defaultProfile = HauntSettings.DEFAULT_ROUTING_PROFILE,
         ),
     )
+
+    /** Applies an edit from the service editor ([profile] only matters for routing). */
+    fun applyService(s: HauntSettings, kind: ServiceKind, url: String, profile: String?): HauntSettings = when (kind) {
+        ServiceKind.MapStyle -> s.copy(mapStyleUrl = url)
+        ServiceKind.Search -> s.copy(searchUrl = url)
+        ServiceKind.Routing -> s.copy(routingUrl = url, routingProfile = profile ?: s.routingProfile)
+    }
 
     private fun host(url: String): String = runCatching { URI(url.trim()).host }.getOrNull() ?: url.trim()
 

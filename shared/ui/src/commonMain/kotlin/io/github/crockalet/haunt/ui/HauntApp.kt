@@ -35,6 +35,7 @@ import io.github.crockalet.haunt.ui.components.GlassVeil
 import io.github.crockalet.haunt.ui.components.LocalHazeState
 import io.github.crockalet.haunt.ui.map.HauntMap
 import io.github.crockalet.haunt.ui.platform.PlatformBackHandler
+import io.github.crockalet.haunt.ui.screens.ActivityLogScreen
 import io.github.crockalet.haunt.ui.screens.DetectedUi
 import io.github.crockalet.haunt.ui.screens.LibraryActions
 import io.github.crockalet.haunt.ui.screens.LibraryScreen
@@ -49,6 +50,9 @@ import io.github.crockalet.haunt.ui.screens.SearchUiState
 import io.github.crockalet.haunt.ui.screens.SettingsActions
 import io.github.crockalet.haunt.ui.screens.SettingsScreen
 import io.github.crockalet.haunt.ui.screens.SettingsUiState
+import io.github.crockalet.haunt.ui.screens.ServiceActions
+import io.github.crockalet.haunt.ui.screens.ServiceScreen
+import io.github.crockalet.haunt.ui.screens.ServiceUiState
 import io.github.crockalet.haunt.ui.screens.ConnectAgentCommand
 import io.github.crockalet.haunt.ui.state.DetectedCoordinates
 import io.github.crockalet.haunt.ui.state.Format
@@ -174,9 +178,9 @@ fun HauntApp(
                                 actions = SettingsActions(
                                     onBack = { state.back() },
                                     onAdbChange = data.onAdbControlChange,
-                                    onSeeAllLog = data.onSeeAllLog,
+                                    onSeeAllLog = { state.navigate(Screen.ActivityLog) },
                                     onCopyCommand = { clipboard.setText(AnnotatedString(ConnectAgentCommand)) },
-                                    onService = data.onServiceClick,
+                                    onService = state::editService,
                                     onTheme = {
                                         state.theme = it
                                         onThemeChange(it)
@@ -199,6 +203,29 @@ fun HauntApp(
                                     },
                                 ),
                             )
+                            Screen.ActivityLog -> ActivityLogScreen(
+                                log = data.activityLog,
+                                onBack = { state.back() },
+                                onClear = data.onClearLog,
+                            )
+                            Screen.Service -> state.service?.let { endpoint ->
+                                ServiceScreen(
+                                    state = ServiceUiState(
+                                        endpoint = endpoint,
+                                        url = state.serviceUrl,
+                                        profile = state.serviceProfile,
+                                        urlError = state.serviceUrlError,
+                                        profileError = state.serviceProfileError,
+                                    ),
+                                    actions = ServiceActions(
+                                        onBack = { state.back() },
+                                        onUrlChange = { state.serviceUrl = it },
+                                        onProfileChange = { state.serviceProfile = it },
+                                        onReset = state::resetService,
+                                        onSave = { state.saveService(data.onServiceSave) },
+                                    ),
+                                )
+                            }
                             Screen.Map -> Unit
                         }
                     }

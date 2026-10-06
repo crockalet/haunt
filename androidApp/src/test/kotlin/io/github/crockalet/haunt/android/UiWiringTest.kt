@@ -24,6 +24,7 @@ import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.RouteRequest
+import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.theme.FolderColors
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -101,6 +102,8 @@ class UiMappingTest {
         assertEquals("14:03", rows.first().time)
         assertEquals("haunt.STOP (broadcast)", rows.first().text)
         assertEquals(false, rows.first().ok)
+        assertEquals("off", rows.first().detail)
+        assertNull(rows[1].detail)
         assertEquals("location.set lat=35.6, lng=139.7", rows[1].text)
     }
 
@@ -113,7 +116,24 @@ class UiMappingTest {
         assertEquals(ThemeMode.Dark, UiMapping.theme(UiMapping.theme(ThemeMode.Dark)))
         assertEquals(MapStyle.OpenFreeMap, UiMapping.mapStyle(HauntSettings()))
         assertEquals("tiles.example.org", UiMapping.services(HauntSettings(mapStyleUrl = "https://tiles.example.org/style.json"))[0].url)
-        assertEquals(listOf("OpenFreeMap", "Photon", "OSRM demo"), UiMapping.services(HauntSettings()).map { it.provider })
+        assertEquals(listOf("OpenFreeMap", "Photon", "OSRM demo · driving"), UiMapping.services(HauntSettings()).map { it.provider })
+    }
+
+    @Test
+    fun serviceEditorRoundTrip() {
+        val custom = HauntSettings(routingUrl = "https://osrm.example.org", routingProfile = "foot")
+        val routing = UiMapping.services(custom).single { it.kind == ServiceKind.Routing }
+        assertEquals("https://osrm.example.org", routing.value)
+        assertEquals(HauntSettings.DEFAULT_ROUTING_URL, routing.defaultValue)
+        assertEquals("foot", routing.profile)
+        assertEquals(HauntSettings.DEFAULT_ROUTING_PROFILE, routing.defaultProfile)
+        assertEquals("OSRM (custom) · foot", routing.provider)
+        assertNull(UiMapping.services(custom).single { it.kind == ServiceKind.Search }.profile)
+
+        val s = HauntSettings()
+        assertEquals(custom, UiMapping.applyService(s, ServiceKind.Routing, "https://osrm.example.org", "foot"))
+        assertEquals(s.copy(searchUrl = "https://photon.example.org"), UiMapping.applyService(s, ServiceKind.Search, "https://photon.example.org", null))
+        assertEquals(s.copy(mapStyleUrl = "https://tiles.example.org/s.json"), UiMapping.applyService(s, ServiceKind.MapStyle, "https://tiles.example.org/s.json", "ignored"))
     }
 }
 
