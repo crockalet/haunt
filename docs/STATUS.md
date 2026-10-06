@@ -13,11 +13,10 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
 | `cli` | Done, ~33 tests | `haunt devices/status/set/go/play/pause/resume/stop/speed/search/watch/fav/mcp`; ADB forward to `localabstract:haunt`, auto-starts `ControlService`; `haunt mcp` (MCP Kotlin SDK, 15 tools incl. `wait_for_arrival`). Verified with the installed binary (no device). |
 | `shared/ui` | Done | Glass design system (Haze), all screens from the mockups, light/dark, screenshot tests → `docs/screenshots/`. Map = maplibre-compose (Android); drawn stand-in on JVM. |
 | `androidApp` | Done, ~45 tests | `HauntRuntime` (settings, favourites, history, tracks, activity log), test-provider injection (+ fused mock in `play` flavour), `HauntService` (location FGS + notification), `ControlService` (socket server, peer-uid check), `AdbCommandReceiver` (broadcast fallback), Photon search/reverse, OSRM routing, onboarding, GPX/KML import, launcher icon. |
-| CI | **Not enabled** | Workflow is ready at `docs/ci/ci.yml` (jvm + androidApp unit tests, CLI dist, foss/play APKs; also runs on manual dispatch). Every command in it passes locally. Cloud sessions still can't push it: on 2026-10-06 both `git push` and the GitHub App (MCP `push_files`) were refused with "required `workflow` scope". Enable it from a normal checkout: `git mv docs/ci/ci.yml .github/workflows/ci.yml`, commit, push — or grant the Claude GitHub App *Workflows: write* and reconnect GitHub at claude.ai. |
+| CI | Enabled | `.github/workflows/ci.yml` (added 2026-10-06): on push to `main`, PRs and manual dispatch — jvm + androidApp unit tests, CLI dist, foss/play debug APKs (artifact `haunt-debug`; test reports on failure). Cloud sessions can't push changes to workflow files (no `workflow` scope); edit them from a normal checkout or the GitHub web UI. |
 
 ## Next steps (in order)
-1. **Enable CI** (see above; needs the user or a token with `workflow` scope).
-2. **On-device test pass** (real phone or an emulator with KVM). Checklist:
+1. **On-device test pass** (real phone or an emulator with KVM). Checklist:
    - Install `androidApp-foss-debug.apk`; onboarding: Developer options deep link, mock-app selection detected via AppOps, location + notification permission flows, auto-advance.
    - Pin / route / joystick mocking end-to-end; confirm with `adb shell dumpsys location` and Google Maps.
    - Foreground services on API 34+: `HauntService` (type `location`), `ControlService` (type `specialUse`) started from the UI and from `adb shell am start-foreground-service`.
@@ -25,9 +24,9 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
    - CLI + MCP against the device: `haunt set`, `go --roads`, `play track.gpx --rate 2x`, `watch --until-finished`, and `claude mcp add haunt -- haunt mcp`.
    - Live Photon search/reverse, OSRM routing, MapLibre long-press, glass blur performance, adaptive icon, targetSdk 37 behaviour.
    - `play` flavour: fused mock mode actually reaching apps that use Play Services location.
-3. **Gaps to close**: custom muted MapLibre style matching the mockups (currently stock OpenFreeMap positron/dark); OSRM public demo only serves `driving` (walking routes follow car roads unless the user points Settings → Routing at a server with a `foot` profile; consider defaulting walk/cycle routes to a public foot/bike server, or a Valhalla backend). Done 2026-10-06: service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
-4. **Release prep (M5)**: decide the final application ID (placeholder `io.github.crockalet.haunt`, can't change after publishing), signing, F-Droid metadata, Play listing "Haunt: Fake GPS Location" (Play may ask about the `specialUse` FGS), CLI distribution (fat JAR now; consider GraalVM native image / Homebrew).
-5. Backlog features: see `docs/DESIGN.md` §1 (QS tile, realism/jitter, scenario files, desktop companion for iOS, …).
+2. **Gaps to close**: custom muted MapLibre style matching the mockups (currently stock OpenFreeMap positron/dark); OSRM public demo only serves `driving` (walking routes follow car roads unless the user points Settings → Routing at a server with a `foot` profile; consider defaulting walk/cycle routes to a public foot/bike server, or a Valhalla backend). Done 2026-10-06: service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
+3. **Release prep (M5)**: decide the final application ID (placeholder `io.github.crockalet.haunt`, can't change after publishing), signing, F-Droid metadata, Play listing "Haunt: Fake GPS Location" (Play may ask about the `specialUse` FGS), CLI distribution (fat JAR now; consider GraalVM native image / Homebrew).
+4. Backlog features: see `docs/DESIGN.md` §1 (QS tile, realism/jitter, scenario files, desktop companion for iOS, …).
 
 ## Decision log
 | Decision | Why |
