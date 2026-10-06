@@ -59,6 +59,18 @@ class NetParsingTest {
     }
 
     @Test
+    fun photonReverseUrl() {
+        assertEquals(
+            "https://photon.komoot.io/reverse?lat=35.000000&lon=139.500000&limit=5",
+            PhotonGeocoder.buildReverseUrl("https://photon.komoot.io/", LatLng(35.0, 139.5), 5),
+        )
+        assertEquals(
+            "https://x.org/reverse?lat=1.000000&lon=2.000000&limit=50",
+            PhotonGeocoder.buildReverseUrl("https://x.org/api/", LatLng(1.0, 2.0), 99),
+        )
+    }
+
+    @Test
     fun geocoderUsesCurrentBaseUrl() = runTest {
         val urls = mutableListOf<String>()
         var base = "https://a.example"

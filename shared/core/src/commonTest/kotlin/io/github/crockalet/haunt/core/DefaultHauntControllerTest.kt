@@ -192,6 +192,42 @@ class DefaultHauntControllerTest {
     }
 
     @Test
+    fun setLoopModeChangesLoopWithoutRestarting() = runTest {
+        val h = harness()
+        h.controller.playRoute(straight, Speed(10.0), LoopMode.Once)
+        advance(30.seconds)
+        h.controller.setLoopMode(LoopMode.Loop)
+        val m = h.moving()
+        assertEquals(LoopMode.Loop, m.loop)
+        assertEquals(300.0, m.progress.traveledMeters, 1e-6) // kept its place
+        advance(80.seconds) // 1100 m → wrapped instead of finishing
+        assertEquals(100.0, h.moving().progress.traveledMeters, 1e-6)
+    }
+
+    @Test
+    fun setLoopModeFromPingPongBackwardsCarriesOnForwards() = runTest {
+        val h = harness()
+        h.controller.playRoute(straight, Speed(10.0), LoopMode.PingPong)
+        advance(105.seconds) // on the way back, 950 m from the origin
+        h.controller.setLoopMode(LoopMode.Once)
+        val m = h.moving()
+        assertEquals(LoopMode.Once, m.loop)
+        assertEquals(950.0, Geo.distanceMeters(origin, m.fix.position), 1e-3)
+        assertEquals(0f, m.fix.bearing!!, 1e-3f)
+        advance(6.seconds) // reaches the end and holds there
+        val held = assertIs<HauntState.Holding>(h.controller.state.value)
+        assertEquals(north1km, held.fix.position)
+    }
+
+    @Test
+    fun setLoopModeIgnoredWhenNotPlaying() = runTest {
+        val h = harness()
+        h.controller.setLocation(origin)
+        h.controller.setLoopMode(LoopMode.Loop)
+        assertIs<HauntState.Holding>(h.controller.state.value)
+    }
+
+    @Test
     fun pauseFreezesPositionButKeepsEmitting() = runTest {
         val h = harness()
         h.controller.playRoute(straight, Speed(10.0))

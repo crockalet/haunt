@@ -92,6 +92,10 @@ class FakeHauntController(
         }
     }
 
+    override fun setLoopMode(loop: LoopMode) {
+        (_state.value as? HauntState.Moving)?.let { _state.value = it.copy(loop = loop) }
+    }
+
     override fun pause() {
         (_state.value as? HauntState.Moving)?.let { _state.value = it.copy(paused = true) }
     }

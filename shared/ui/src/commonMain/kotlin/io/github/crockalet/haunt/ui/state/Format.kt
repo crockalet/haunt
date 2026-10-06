@@ -1,5 +1,7 @@
 package io.github.crockalet.haunt.ui.state
 
+import io.github.crockalet.haunt.core.CoordinateParseResult
+import io.github.crockalet.haunt.core.CoordinateParser
 import io.github.crockalet.haunt.core.LatLng
 import kotlin.math.abs
 import kotlin.math.pow
@@ -35,6 +37,12 @@ object Format {
         else -> "${seconds / 3600} h ${((seconds % 3600) / 60).toString().padStart(2, '0')} min"
     }
 
+    /** Playback rate chip: "1×", "2×", "1.5×". */
+    fun rate(multiplier: Double): String {
+        val whole = multiplier.roundToLong()
+        return if (abs(multiplier - whole) < 0.05) "$whole×" else "${fixed(multiplier, 1)}×"
+    }
+
     fun kmh(metersPerSecond: Double): String = "${(metersPerSecond * 3.6).roundToLong()} km/h"
 
     /** Eight-point compass direction for a bearing. */
@@ -46,31 +54,12 @@ object Format {
 }
 
 /**
- * Minimal coordinate parser used when the app doesn't supply one: decimal `lat, lng` and
- * DMS (`35°39'34"N 139°42'02"E`). The full parser (Maps links, plus codes…) is provided by the
- * caller of [io.github.crockalet.haunt.ui.HauntApp].
+ * Detects coordinates in pasted text with the full [CoordinateParser] (decimal, DMS, DDM, Google
+ * Maps links, geo: URIs, plus codes). [reference] resolves short plus codes. Null if [text] isn't
+ * coordinates.
  */
-fun parseSimpleCoordinates(text: String): DetectedCoordinates? {
-    val t = text.trim()
-    val decimal = Regex("""^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$""").find(t)
-    if (decimal != null) {
-        val lat = decimal.groupValues[1].toDouble()
-        val lng = decimal.groupValues[2].toDouble()
-        return if (lat in -90.0..90.0 && lng in -180.0..180.0) DetectedCoordinates(LatLng(lat, lng), "Decimal") else null
+fun detectCoordinates(text: String, reference: LatLng? = null): DetectedCoordinates? =
+    when (val r = CoordinateParser.parse(text, reference)) {
+        is CoordinateParseResult.Success -> DetectedCoordinates(r.position, r.format.label, r.label)
+        is CoordinateParseResult.Failure -> null
     }
-    val dms = Regex("""(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([NSEW])""")
-    val parts = dms.findAll(t).toList()
-    if (parts.size == 2) {
-        fun value(m: MatchResult): Pair<Double, Char> {
-            val (d, mi, s, h) = m.destructured
-            val v = d.toDouble() + mi.toDouble() / 60 + s.toDouble() / 3600
-            return (if (h == "S" || h == "W") -v else v) to h[0]
-        }
-        val (a, ha) = value(parts[0])
-        val (b, hb) = value(parts[1])
-        val (lat, lng) = if (ha == 'N' || ha == 'S') a to b else b to a
-        if (hb == ha) return null
-        return DetectedCoordinates(LatLng(lat, lng), "DMS")
-    }
-    return null
-}

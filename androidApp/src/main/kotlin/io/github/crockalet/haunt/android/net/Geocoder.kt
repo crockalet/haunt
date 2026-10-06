@@ -14,6 +14,9 @@ import kotlinx.serialization.json.jsonObject
 interface Geocoder {
     /** @throws java.io.IOException on network / server failure. */
     suspend fun search(query: String, limit: Int = 5, near: LatLng? = null): List<Place>
+
+    /** Places at / around [position], nearest first (reverse geocoding). Empty if unsupported. @throws java.io.IOException */
+    suspend fun reverse(position: LatLng, limit: Int = 5): List<Place> = emptyList()
 }
 
 /**
@@ -27,7 +30,16 @@ class PhotonGeocoder(
     override suspend fun search(query: String, limit: Int, near: LatLng?): List<Place> =
         PhotonParser.parse(http.get(buildUrl(baseUrl(), query, limit, near)))
 
+    override suspend fun reverse(position: LatLng, limit: Int): List<Place> =
+        PhotonParser.parse(http.get(buildReverseUrl(baseUrl(), position, limit)))
+
     companion object {
+        /** `GET {base}/reverse?lat=…&lon=…&limit=…` (a base ending in `/api` is accepted too). */
+        fun buildReverseUrl(base: String, position: LatLng, limit: Int): String {
+            val root = base.trim().trimEnd('/').removeSuffix("/api")
+            return "$root/reverse?lat=${position.lat.coord()}&lon=${position.lng.coord()}&limit=${limit.coerceIn(1, 50)}"
+        }
+
         fun buildUrl(base: String, query: String, limit: Int, near: LatLng?): String {
             val trimmed = base.trim().trimEnd('/')
             val endpoint = if (trimmed.endsWith("/api")) "$trimmed/" else "$trimmed/api/"

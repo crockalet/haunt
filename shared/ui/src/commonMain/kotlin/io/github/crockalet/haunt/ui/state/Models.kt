@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
+import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
 
 /** The three map modes in the toolbar. */
@@ -32,8 +33,18 @@ data class Place(
 @Immutable
 data class Folder(val id: String, val name: String, val color: Color)
 
+/**
+ * A saved track. [route] carries the full recorded data (timestamps, altitudes) when known, so a
+ * GPX track can be replayed by its recorded timing; otherwise [points] are played at a constant speed.
+ */
 @Immutable
-data class Track(val name: String, val subtitle: String, val points: List<LatLng> = emptyList())
+data class Track(
+    val name: String,
+    val subtitle: String,
+    val points: List<LatLng> = emptyList(),
+    val route: Route? = null,
+    val id: String? = null,
+)
 
 @Immutable
 data class LogEntry(val time: String, val text: String, val ok: Boolean = true)
@@ -44,9 +55,23 @@ data class AgentConnection(val name: String, val via: String)
 @Immutable
 data class ServiceEndpoint(val title: String, val provider: String, val url: String)
 
-/** Result of parsing pasted text as coordinates. The real parser lives elsewhere; see [parseSimpleCoordinates]. */
+/**
+ * Result of parsing pasted text as coordinates (see [detectCoordinates]).
+ *
+ * @property format how it was written ("DMS", "Plus code"…), shown as "<format> detected".
+ * @property name a place label carried by the input (geo: URI label, Maps `/place/Name/`).
+ */
 @Immutable
-data class DetectedCoordinates(val position: LatLng, val format: String? = null)
+data class DetectedCoordinates(val position: LatLng, val format: String? = null, val name: String? = null) {
+    val label: String get() = format?.let { "$it detected" } ?: "Coordinates detected"
+}
+
+/**
+ * A short message shown in a glass banner over the map (e.g. why mocking couldn't start).
+ * [hint] is a second, muted line telling the user what to do.
+ */
+@Immutable
+data class Notice(val text: String, val hint: String? = null, val error: Boolean = true)
 
 /** Default per-user settings shown in Settings → Defaults. */
 @Immutable

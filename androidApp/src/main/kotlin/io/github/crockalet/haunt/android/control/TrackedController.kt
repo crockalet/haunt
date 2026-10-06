@@ -117,6 +117,11 @@ class TrackedController(
         delegate.setPlaybackRate(multiplier)
     }
 
+    override fun setLoopMode(loop: LoopMode) = synchronized(lock) {
+        settleLocked()
+        delegate.setLoopMode(loop)
+    }
+
     override fun pause() = synchronized(lock) {
         settleLocked()
         delegate.pause()

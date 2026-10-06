@@ -58,6 +58,22 @@ class TrackedControllerTest {
     }
 
     @Test
+    fun setLoopModeKeepsTheSameRoute() = runTest {
+        val h = harness()
+        val id = h.controller.play(route, Speed(10.0))
+        advance(5.seconds)
+        h.controller.setLoopMode(LoopMode.Loop)
+        val m = assertIs<HauntState.Moving>(h.controller.state.value)
+        assertEquals(LoopMode.Loop, m.loop)
+        assertEquals(50.0, m.progress.traveledMeters, 1e-6)
+        assertEquals(id, h.controller.currentRouteId)
+        advance(10.seconds) // would have arrived with Once
+        h.controller.onStateObserved()
+        assertIs<HauntState.Moving>(h.controller.state.value)
+        assertTrue(h.finished().isEmpty())
+    }
+
+    @Test
     fun arrivalBeforeNextCommandIsNotReportedAsReplaced() = runTest {
         val h = harness()
         h.controller.play(route, Speed(10.0))

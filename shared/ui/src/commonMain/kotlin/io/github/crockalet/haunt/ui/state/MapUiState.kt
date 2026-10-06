@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import io.github.crockalet.haunt.core.HauntState
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
+import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
 import io.github.crockalet.haunt.core.currentFix
 import kotlin.math.roundToLong
@@ -52,7 +53,10 @@ data class RouteDetails(
     val speedLabel: String,
     val followRoads: Boolean,
     val loop: LoopMode,
-    val rate: Int,
+    /** Rate chip text ("1×"); the recorded-track multiplier while one plays by its timestamps. */
+    val rateLabel: String,
+    /** Value of the Custom speed editor (km/h). */
+    val customKmh: Float,
     val playing: Boolean,
     val canPlay: Boolean,
 )
@@ -94,6 +98,10 @@ data class LocalUiState(
     val expanded: Boolean = false,
     val draftRoute: List<LatLng> = emptyList(),
     val draftName: String? = null,
+    /** Full track behind the draft when it came from the library (timestamps, altitudes). */
+    val draftTrack: Route? = null,
+    /** Polyline actually being played (road-following), drawn instead of the stops while moving. */
+    val playingRoute: List<LatLng>? = null,
     val speedPreset: SpeedPreset = SpeedPreset.Walk,
     val customSpeed: Speed = Speed.kmh(30.0),
     val followRoads: Boolean = true,
@@ -165,7 +173,8 @@ fun buildMapUiState(
             speedLabel = Format.kmh(local.presetSpeed().metersPerSecond),
             followRoads = local.followRoads,
             loop = moving?.loop ?: local.loop,
-            rate = local.rate,
+            rateLabel = Format.rate(moving?.playbackRate ?: local.rate.toDouble()),
+            customKmh = local.customSpeed.kmh.toFloat(),
             playing = moving != null && !moving.paused,
             canPlay = moving != null || local.draftRoute.size >= 2,
         )
@@ -199,8 +208,9 @@ fun buildMapUiState(
 
     val moving = engine as? HauntState.Moving
     val routePoints = when {
-        local.mode == MapMode.Route -> local.draftRoute
-        else -> emptyList()
+        local.mode != MapMode.Route -> emptyList()
+        moving != null && (local.playingRoute?.size ?: 0) >= 2 -> local.playingRoute!!
+        else -> local.draftRoute
     }
     val traveledPoints = if (moving != null && routePoints.size >= 2) {
         Geo.split(routePoints, moving.progress.traveledMeters).first

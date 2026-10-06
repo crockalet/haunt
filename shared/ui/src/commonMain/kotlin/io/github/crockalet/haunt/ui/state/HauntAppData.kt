@@ -17,8 +17,10 @@ data class HauntAppData(
     val recent: List<Place> = emptyList(),
     /** Places near a point (reverse geocoding / POIs). */
     val nearby: (LatLng) -> List<Place> = { emptyList() },
-    /** Free-text place search. */
+    /** Free-text place search (synchronous; previews). Ignored when [placeSearch] is set. */
     val search: (String) -> List<Place> = { emptyList() },
+    /** Debounced, asynchronous search + nearby places (the app's geocoder). Overrides [search] / [nearby] / [areaName]. */
+    val placeSearch: PlaceSearch? = null,
     /** Short area name for a coordinate ("Shibuya, Tokyo"), if known. */
     val areaName: (LatLng) -> String? = { null },
     val adbControlEnabled: Boolean = false,
@@ -30,6 +32,8 @@ data class HauntAppData(
     val onSaveFavourite: (Place) -> Unit = {},
     val onServiceClick: (ServiceEndpoint) -> Unit = {},
     val onSeeAllLog: () -> Unit = {},
+    /** Settings → Defaults changed (update rate, accuracy, units); persist them. */
+    val onDefaultsChange: (HauntDefaults) -> Unit = {},
 ) {
     companion object {
         val DefaultServices = listOf(

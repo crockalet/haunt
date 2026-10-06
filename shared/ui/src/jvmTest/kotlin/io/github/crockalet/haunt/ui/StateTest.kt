@@ -16,7 +16,7 @@ import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.SampleData
 import io.github.crockalet.haunt.ui.state.StatusUi
 import io.github.crockalet.haunt.ui.state.buildMapUiState
-import io.github.crockalet.haunt.ui.state.parseSimpleCoordinates
+import io.github.crockalet.haunt.ui.state.detectCoordinates
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,17 +56,37 @@ class FormatTest {
 class ParserTest {
     @Test
     fun decimal() {
-        assertEquals(LatLng(35.65944, 139.70056), parseSimpleCoordinates(" 35.65944, 139.70056 ")?.position)
-        assertNull(parseSimpleCoordinates("95.0, 10.0"))
-        assertNull(parseSimpleCoordinates("Yoyogi Park"))
+        val d = assertNotNull(detectCoordinates(" 35.65944, 139.70056 "))
+        assertEquals(LatLng(35.65944, 139.70056), d.position)
+        assertEquals("Decimal detected", d.label)
+        assertNull(detectCoordinates("95.0, 10.0"))
+        assertNull(detectCoordinates("Yoyogi Park"))
     }
 
     @Test
     fun dms() {
-        val p = assertNotNull(parseSimpleCoordinates("35°39'34\"N 139°42'02\"E")).position
-        assertEquals("35.65944, 139.70056", Format.coords(p))
-        val s = assertNotNull(parseSimpleCoordinates("33°52'04\"S 151°12'36\"E")).position
+        val d = assertNotNull(detectCoordinates("35°39'34\"N 139°42'02\"E"))
+        assertEquals("35.65944, 139.70056", Format.coords(d.position))
+        assertEquals("DMS detected", d.label)
+        val s = assertNotNull(detectCoordinates("33°52'04\"S 151°12'36\"E")).position
         assertTrue(s.lat < 0)
+    }
+
+    @Test
+    fun linksAndPlusCodes() {
+        val maps = assertNotNull(detectCoordinates("https://www.google.com/maps/@35.6586,139.7454,17z"))
+        assertEquals(LatLng(35.6586, 139.7454), maps.position)
+        assertEquals("Google Maps link detected", maps.label)
+        val geo = assertNotNull(detectCoordinates("geo:0,0?q=35.6586,139.7454(Tokyo Tower)"))
+        assertEquals("Tokyo Tower", geo.name)
+        assertEquals("Plus code detected", assertNotNull(detectCoordinates("8Q7XMP6W+9Q")).label)
+    }
+
+    @Test
+    fun rateLabels() {
+        assertEquals("1×", Format.rate(1.0))
+        assertEquals("4×", Format.rate(4.0))
+        assertEquals("1.5×", Format.rate(1.5))
     }
 }
 
