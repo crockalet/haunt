@@ -1,10 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation,ProtectedPermissions" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Map tiles (OpenFreeMap) and styles. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".HauntApplication"
         android:label="Haunt"
         android:supportsRtl="true">
         <activity
@@ -15,5 +28,40 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Mocking: keeps the process alive and shows the ongoing notification (DESIGN §5). -->
+        <service
+            android:name=".HauntService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- ADB control socket host, started by the CLI with `am start-foreground-service` (DESIGN §6.1).
+             Exported so the shell user can start it, guarded by DUMP (shell/system only); the socket
+             itself only accepts uid shell/root. -->
+        <service
+            android:name=".ControlService"
+            android:exported="true"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.DUMP"
+            tools:ignore="ProtectedPermissions">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Local control socket so a developer's computer can drive mock locations over adb" />
+        </service>
+
+        <!-- Broadcast fallback (DESIGN §6.2); DUMP is held by the shell user only. -->
+        <receiver
+            android:name=".AdbCommandReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            tools:ignore="ProtectedPermissions">
+            <intent-filter>
+                <action android:name="haunt.SET" />
+                <action android:name="haunt.STOP" />
+                <action android:name="haunt.PAUSE" />
+                <action android:name="haunt.RESUME" />
+                <action android:name="haunt.STATUS" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

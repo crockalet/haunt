@@ -147,7 +147,7 @@ Idle ──start(pos)──► Holding(pos) ──play(route)──► Moving(ro
 - Joystick: integrate `(bearing, magnitude × speed)` into a destination point each tick.
 
 ### Parsing
-- GPX 1.1 / KML (`<LineString>`, `<Point>`, `gx:Track`) via a small XML pull parser (xmlutil).
+- GPX 1.1 / KML (`<LineString>`, `<Point>`, `gx:Track`) via a small built-in XML reader (`core/Xml.kt`; no xmlutil dependency).
 - Coordinates: `35.6586, 139.7454`, `35°39'31"N 139°44'43"E`, Google Maps URLs (`@lat,lng`, `?q=lat,lng`),
   geo: URIs, Open Location Code / plus codes.
 
@@ -162,22 +162,31 @@ interface LocationInjector { fun start(); fun push(fix: Fix); fun stop() }
   `NETWORK_PROVIDER` and (API 31+) `FUSED_PROVIDER`; `setTestProviderLocation` each tick with full
   accuracy fields (vertical/speed/bearing accuracy on API 26+). `removeTestProvider` on stop.
 - `FusedMockInjector` (play flavour only): `setMockMode(true)` / `setMockLocation`.
-- `HauntService`: foreground service (type `location`), owns the injector and collects `fixes`.
-  Notification shows place name / coordinates, state, Pause/Stop actions.
+- `InjectionPipeline` (owned by the process-wide `HauntRuntime`): starts the injector when the controller
+  leaves Idle, pushes every fix, removes the providers on Idle. `SecurityException` → mocking stops and an
+  `event.error` (MOCK_APP_NOT_SELECTED) goes out. Injection never waits for a service to start.
+- `HauntService`: foreground service (type `location`) that runs while not Idle, keeps the process alive and
+  shows the notification (place name / coordinates, state, Pause/Resume/Stop). It stops itself on Idle.
+  Android 14+ requires a granted location permission for a `location` FGS (also when started via adb), so
+  mocking calls fail with UNAVAILABLE + a hint until it is granted (`pm grant … ACCESS_FINE_LOCATION` works).
 
 ---
 
 ## 6. Agent control over ADB
 
 ### 6.1 Socket channel (primary)
-- The app listens on `LocalServerSocket("haunt")` (abstract namespace) inside `HauntService` /
-  a lightweight `ControlService`.
+- The app listens on `LocalServerSocket("haunt")` (abstract namespace) inside the lightweight
+  `ControlService` (`io.github.crockalet.haunt/.android.ControlService`, foreground type `specialUse`,
+  exported but guarded by `android.permission.DUMP`). It shares the notification with `HauntService`, stays up
+  while clients are connected or mocking is active, and stops itself after 3 idle minutes.
 - **Auth:** on accept, read `LocalSocket.peerCredentials.uid`; allow only `2000` (shell) or `0` (root).
   Other apps on the device are rejected. ADB itself authorises the computer. No tokens.
-- If "Allow ADB control" is off → reject with an error explaining where to enable it.
+- If "Allow ADB control" is off → the connection is accepted but every call (including `hello`) fails with
+  ADB_CONTROL_DISABLED and a hint explaining where to enable it.
 - CLI side: `adb [-s serial] forward tcp:0 localabstract:haunt` (picks a free port) → TCP connect.
 - If the app isn't running, the CLI starts it:
-  `adb shell am start-foreground-service -n io.github.crockalet.haunt/.ControlService`.
+  `adb shell am start-foreground-service -n io.github.crockalet.haunt/.android.ControlService`
+  (`Protocol.CONTROL_SERVICE_COMPONENT`).
 
 **Framing:** newline-delimited JSON-RPC 2.0. First message is `hello` (protocol version, app version).
 
@@ -202,11 +211,13 @@ Every call coming from ADB is written to the in-app **Agent activity log** (C3).
 
 ### 6.2 Broadcast channel (fallback, no CLI needed)
 ```
-adb shell am broadcast -n io.github.crockalet.haunt/.AdbCommandReceiver \
+adb shell am broadcast -n io.github.crockalet.haunt/.android.AdbCommandReceiver \
     -a haunt.SET --ed lat 35.6586 --ed lng 139.7454
 ```
 Actions: `haunt.SET`, `haunt.STOP`, `haunt.PAUSE`, `haunt.RESUME`, `haunt.STATUS`.
-The result goes back via `setResultData` (JSON), which `am broadcast` prints.
+Extras: `--ed lat/lng/alt`, `--ef acc`, `--es query` (see `Protocol.Broadcast`).
+The result goes back via `setResultData` (JSON: the method's result, or `{"error":{code,message,data}}`),
+which `am broadcast` prints. Calls honour "Allow ADB control" and appear in the activity log.
 Receiver is exported but guarded with `android:permission="android.permission.DUMP"`
 (held by shell, not grantable to third-party apps). *To verify on API 26–36.*
 
