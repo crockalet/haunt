@@ -35,6 +35,8 @@ play-services-location = { module = "com.google.android.gms:play-services-locati
 
 clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
 mcp-kotlin-sdk = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcp" }
+mcp-kotlin-sdk-server = { module = "io.modelcontextprotocol:kotlin-sdk-server", version.ref = "mcp" }
+mcp-kotlin-sdk-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcp" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
