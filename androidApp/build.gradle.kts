@@ -12,8 +12,20 @@ android {
         applicationId = "io.github.crockalet.haunt"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI passes -Phaunt.versionCode=<run number> so each nightly installs over the previous one.
+        versionCode = providers.gradleProperty("haunt.versionCode").orNull?.toInt() ?: 1
+        versionName = "0.1.0" + providers.gradleProperty("haunt.versionSuffix").getOrElse("")
+    }
+
+    signingConfigs {
+        // Shared, public debug key (standard "android" passwords) so debug builds from any machine or CI
+        // run update each other. Not for releases.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     flavorDimensions += "distribution"
