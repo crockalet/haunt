@@ -71,9 +71,10 @@ data class SettingsActions(
     val onUnits: () -> Unit = {},
     val onJoystickSize: () -> Unit = {},
     val onFloatingJoystick: (Boolean) -> Unit = {},
+    val onDataLicences: () -> Unit = {},
 )
 
-/** Settings: ADB control + activity log, connect an agent, services, defaults. */
+/** Settings: ADB control + activity log, connect an agent, services, defaults, about. */
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
@@ -224,6 +225,20 @@ fun SettingsScreen(
                     trailing = {
                         Switch(state.defaults.floatingJoystick, actions.onFloatingJoystick, contentDescription = "Float over other apps")
                     },
+                )
+            }
+        }
+
+        Column {
+            SectionHeader("About")
+            ListGroup {
+                ListRow(
+                    title = "Data & licences",
+                    subtitle = "Map data, routing and search credits, open-source licences",
+                    minHeight = 58.dp,
+                    padding = ItemPadding,
+                    onClick = actions.onDataLicences,
+                    trailing = { Icon(HauntIcons.ChevronRight, null, size = 18.dp, tint = c.muted) },
                 )
             }
         }

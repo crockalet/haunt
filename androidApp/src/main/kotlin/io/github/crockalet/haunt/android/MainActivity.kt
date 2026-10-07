@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.edit
@@ -27,6 +28,7 @@ import io.github.crockalet.haunt.android.location.RealLocationException
 import io.github.crockalet.haunt.android.ui.AndroidCommands
 import io.github.crockalet.haunt.android.ui.OnboardingFlow
 import io.github.crockalet.haunt.android.ui.OnboardingInputs
+import io.github.crockalet.haunt.android.ui.OpenSourceLicences
 import io.github.crockalet.haunt.android.ui.UiMapping
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.protocol.HauntEvent
@@ -42,6 +44,7 @@ import io.github.crockalet.haunt.ui.screens.OnboardingUiState
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.Notice
+import io.github.crockalet.haunt.ui.state.OpenSourceInfo
 import io.github.crockalet.haunt.ui.state.PlaceSearch
 import io.github.crockalet.haunt.ui.state.detectCoordinates
 import kotlinx.coroutines.Dispatchers
@@ -183,6 +186,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val openSource by produceState(OpenSourceInfo()) {
+            value = withContext(Dispatchers.IO) {
+                runCatching { OpenSourceLicences.load(this@MainActivity) }
+                    .onFailure { Log.w(TAG, "Couldn't read the licence list", it) }
+                    .getOrDefault(OpenSourceInfo())
+            }
+        }
+        val appVersion = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() }
+
         val zone = remember { ZoneId.systemDefault() }
         val historyPlaces = remember(history) { UiMapping.history(history, System.currentTimeMillis(), zone) }
         val data = HauntAppData(
@@ -216,6 +228,9 @@ class MainActivity : ComponentActivity() {
                     throw CommandException(e.message ?: "Couldn't find your location", e.hint, e)
                 }
             },
+            openSource = openSource,
+            loadNotice = { path -> withContext(Dispatchers.IO) { OpenSourceLicences.readNotice(this@MainActivity, path) } },
+            appVersion = appVersion,
         )
 
         HauntApp(

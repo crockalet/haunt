@@ -16,6 +16,7 @@ import io.github.crockalet.haunt.ui.screens.OnboardingUiState
 import io.github.crockalet.haunt.ui.state.FakeHauntController
 import io.github.crockalet.haunt.ui.state.Geo
 import io.github.crockalet.haunt.ui.state.HauntAppData
+import io.github.crockalet.haunt.ui.state.LicenceDoc
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.Notice
@@ -153,7 +154,25 @@ class Screenshots {
 
     @Test
     fun settings() {
-        shot("09-settings", height = 1290) { App(it, holding, pinLocal, Screen.Settings) }
+        shot("09-settings", height = 1400) { App(it, holding, pinLocal, Screen.Settings) }
+    }
+
+    @Test
+    fun dataLicences() {
+        shot("15-data-licences", height = 1790) { App(it, holding, pinLocal, Screen.DataLicences) }
+        shot("16-licence-text") {
+            App(it, holding, pinLocal, Screen.DataLicences) { s ->
+                val apache = SampleData.openSource.groups.first()
+                s.openLicenceDoc(
+                    LicenceDoc(
+                        apache.licence.name,
+                        "Used by ${apache.libraries.size} libraries",
+                        apache.libraries.map { l -> "${l.name} ${l.version}" },
+                        apache.licence.url,
+                    ) { apache.licence.text.orEmpty() },
+                )
+            }
+        }
     }
 
     @Test

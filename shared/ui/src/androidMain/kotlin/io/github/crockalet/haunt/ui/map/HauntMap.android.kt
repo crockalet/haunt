@@ -1,13 +1,12 @@
 package io.github.crockalet.haunt.ui.map
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -19,6 +18,8 @@ import io.github.crockalet.haunt.ui.components.RouteEndpoint
 import io.github.crockalet.haunt.ui.state.MapContent
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.theme.HauntTheme
+import kotlinx.coroutines.flow.filter
+import org.maplibre.compose.camera.CameraMoveReason
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraUpdate
 import org.maplibre.compose.expressions.dsl.const
@@ -29,9 +30,7 @@ import org.maplibre.compose.interaction.MapInteractions
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.rememberMapState
-import org.maplibre.compose.overlay.LocalViewportInsets
-import org.maplibre.compose.overlay.MapOverlay
-import org.maplibre.compose.overlay.include
+import org.maplibre.compose.overlay.attributions
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
@@ -120,11 +119,22 @@ actual fun HauntMap(
         derivedStateOf(structuralEqualityPolicy()) { haloRadius(accuracy, mapState.viewport?.metersPerDpAtTarget) }
     }
 
+    // Credits start spelled out (OSMF guideline) and fold into (i) on the first gesture.
+    val attribution = remember { AttributionState() }
+    LaunchedEffect(mapState) {
+        snapshotFlow { mapState.isCameraMoving && mapState.cameraMoveReason == CameraMoveReason.GESTURE }
+            .filter { it }
+            .collect { attribution.onMapGesture() }
+    }
+    val sourceAttributions by remember(mapState) { derivedStateOf { mapState.style.attributions() } }
+    val credits = remember(style, sourceAttributions) { MapAttributions.forStyle(style, sourceAttributions) }
+
     val interactions = remember {
         MapInteractions {
             callbacks {
                 longClick {
                     onEvent { e ->
+                        attribution.onMapGesture()
                         e.position?.let { longPress(LatLng(it.latitude, it.longitude)) }
                         ClickResult.Consume
                     }
@@ -138,10 +148,7 @@ actual fun HauntMap(
         state = mapState,
         interactions = interactions,
         overlay = {
-            // Overlay-only insets: the camera keeps centring on the whole map.
-            CompositionLocalProvider(LocalViewportInsets provides PaddingValues(bottom = bottomInset)) {
-                include(MapOverlay.AttributionOnly)
-            }
+            MapAttributionOverlay(credits, attribution, bottomInset)
             content.route.firstOrNull()?.let { RouteEndpoint(start = true, modifier = Modifier.placedAt(it.toPosition())) }
             if (content.route.size >= 2) RouteEndpoint(start = false, modifier = Modifier.placedAt(content.route.last().toPosition()))
             content.pending?.let { RouteEndpoint(start = false, modifier = Modifier.placedAt(it.toPosition())) }

@@ -265,7 +265,8 @@ Pluggable endpoints (Settings → Map & services):
 | Search | Photon (komoot) | Photon URL, Nominatim URL (1 req/s, no autocomplete) |
 | Routing | OSRM public demo for driving, FOSSGIS `routed-foot` / `routed-bike` for walk / cycle speeds (fair use, ≤ 1 req/s, attribution) | OSRM / Valhalla / GraphHopper URL + optional API key |
 
-All requests send a proper `User-Agent` and attributions are shown on the map. If routing fails,
+All requests send a proper `User-Agent`; credits are shown on the map and in Settings → About → Data & licences
+(see §8 "Attribution"). If routing fails,
 the app falls back to straight lines and tells the user.
 
 ---
@@ -308,7 +309,30 @@ so it shares across platforms and is not tied to Material.
 **Search:** full-screen glass sheet over a blurred map; detects pasted coordinates ("Pick here"), nearby places, recent.
 **Library:** Favourites (folders) · History · Tracks; import GPX / KML.
 **Settings:** ADB control + activity log · "Connect an AI agent" (`claude mcp add haunt -- haunt mcp`) ·
-map & service endpoints · defaults (theme, update rate, accuracy, units) · joystick (pad size, float over other apps).
+map & service endpoints · defaults (theme, update rate, accuracy, units) · joystick (pad size, float over other apps) ·
+about → **Data & licences**.
+
+**Attribution** (OSMF attribution guideline, FOSSGIS and OpenMapTiles terms):
+- Map corner: a solid-glass pill bottom-right, just above the locate button, reading
+  "OpenFreeMap © OpenMapTiles © OpenStreetMap", each a link (openfreemap.org, openmaptiles.org,
+  openstreetmap.org/copyright). It is spelled out at startup without any interaction and folds into an (i) button on
+  the first map gesture (camera pan / zoom / rotate, or long-press); (i) brings it back (`AttributionState`,
+  `MapAttribution.kt`). Custom style URLs show their sources' own attribution HTML (parsed into links), falling back
+  to "© OpenStreetMap". It replaces maplibre-compose's default overlay (`MapOverlay.AttributionOnly`: a MapLibre logo
+  bottom-left plus an expanding attribution box bottom-right, whose text is one horizontally scrolling line that can push
+  the OSM credit out of view on narrow phones); the MapLibre logo is dropped (not required by its BSD licence; it crowded the corner)
+  and MapLibre is credited under Data & licences. The JVM stand-in map shows the same pill.
+- **Data & licences** (Settings → About): map data (© OpenStreetMap contributors / ODbL, "Report a map error" →
+  openstreetmap.org/fixthemap, OpenMapTiles CC-BY 4.0, OpenFreeMap), routing (OSRM; FOSSGIS e.V. servers at
+  routing.openstreetmap.de for walk / cycle, router.project-osrm.org for driving), search (Photon by komoot), Haunt
+  (GPL-3.0-or-later, source link, operator contact e-mail), then open-source licences grouped by licence (tap for the
+  library list and full text), bundled native-code notices, and the two OFL fonts.
+- Licence data is generated at build time, offline: the AboutLibraries Gradle plugin
+  (`com.mikepenz.aboutlibraries.plugin.android`, `offlineMode`) writes `res/raw/aboutlibraries.json` per variant (foss /
+  play differ); licence texts live in `androidApp/config/licenses/` and strict mode fails the build when a new licence
+  (or a BSD / MIT library from another project, whose copyright line would be missing) appears. A `collect<Variant>Notices`
+  task copies MapLibre Native's `META-INF/licenses/` (MapLibre Native, its C/C++ and Rust components, the NDK C++
+  runtime) and Play services' `third_party_licenses` from the AARs into `assets/notices/` — AGP doesn't package them.
 
 **Lifecycle:** backgrounding Haunt keeps faking (and the ADB socket) running; swiping it away from Recents
 stops faking, the floating joystick and both services (`onTaskRemoved`). The CLI restarts `ControlService` on its next call.

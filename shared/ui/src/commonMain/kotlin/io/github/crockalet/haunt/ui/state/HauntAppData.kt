@@ -41,6 +41,12 @@ data class HauntAppData(
     val locateMe: (suspend () -> LatLng)? = null,
     /** Settings → Defaults changed (update rate, accuracy, units); persist them. */
     val onDefaultsChange: (HauntDefaults) -> Unit = {},
+    /** Third-party libraries, licences and bundled notices for Settings → Data & licences. */
+    val openSource: OpenSourceInfo = OpenSourceInfo(),
+    /** Reads a bundled [OssNotice] by its path. */
+    val loadNotice: suspend (path: String) -> String = { "" },
+    /** Shown as "Haunt <version>" on the Data & licences screen. */
+    val appVersion: String? = null,
 ) {
     companion object {
         val DefaultServices = listOf(
@@ -122,7 +128,53 @@ object SampleData {
         agentConnection = AgentConnection("haunt mcp", "via adb (USB) · since 14:01"),
         activityLog = log,
         locateMe = { ShibuyaCrossing },
+        openSource = openSource,
+        appVersion = "0.1.0",
     )
+
+    /** A cut-down library list in the shape the app generates. */
+    val openSource: OpenSourceInfo
+        get() {
+            val apache = OssLicence("Apache-2.0", "Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0", ApacheLicenceSample)
+            val bsd2 = OssLicence("BSD-2-Clause", "BSD 2-Clause License", text = "BSD 2-Clause License\n\nCopyright (c) 2026, MapLibre contributors")
+            val bsd3 = OssLicence("BSD-3-Clause", "BSD 3-Clause License", text = "Copyright (c) 2024, MapLibre Compose contributors")
+            val mit = OssLicence("MIT", "MIT License", text = "MIT License\n\nCopyright (c) 2025 MapLibre Contributors")
+            fun lib(id: String, name: String, version: String, licence: String) = OssLibrary(id, name, version, licenceIds = listOf(licence))
+            return OpenSourceInfo(
+                libraries = listOf(
+                    lib("androidx.activity:activity", "Activity", "1.13.0", "Apache-2.0"),
+                    lib("androidx.compose.foundation:foundation", "Compose Foundation", "1.12.1", "Apache-2.0"),
+                    lib("androidx.compose.ui:ui", "Compose UI", "1.12.1", "Apache-2.0"),
+                    lib("dev.chrisbanes.haze:haze", "Haze", "2.0.1", "Apache-2.0"),
+                    lib("org.jetbrains.kotlin:kotlin-stdlib", "Kotlin Stdlib", "2.4.20", "Apache-2.0"),
+                    lib("org.jetbrains.kotlinx:kotlinx-coroutines-core", "kotlinx-coroutines-core", "1.11.0", "Apache-2.0"),
+                    lib("org.maplibre.compose:maplibre-compose", "MapLibre Compose", "0.19.0", "BSD-3-Clause"),
+                    lib("org.maplibre.nativeffi:maplibre-native-ffi", "MapLibre Native FFI Kotlin binding", "0.202609.5", "BSD-2-Clause"),
+                    lib("org.maplibre.spatialk:geojson", "Spatial K GeoJSON", "0.8.0", "MIT"),
+                ),
+                licences = listOf(apache, bsd2, bsd3, mit).associateBy { it.id },
+                notices = listOf(
+                    OssNotice("MapLibre Native", "maplibre-native-c/maplibre-native.md", "MapLibre Native and its components"),
+                    OssNotice("Rust components", "maplibre-native-c/rust.md", "Rust crates in MapLibre Native FFI"),
+                    OssNotice("Android NDK", "android-ndk/NOTICE", "C++ runtime"),
+                ),
+            )
+        }
+
+    private const val ApacheLicenceSample = """
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License."""
 
     /**
      * Converts mockup screen points (390×844 frame, ~9 m per px) into coordinates so the

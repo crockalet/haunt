@@ -20,6 +20,17 @@ In Claude Code, install it as a plugin:
 Other agents that read Agent Skills can use the `skills/haunt/` folder as is (for example, copy it to `~/.claude/skills/haunt`).
 The skill still needs the `haunt` CLI and the app; it explains where to get them.
 
+## Credits
+
+Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL), tiles by
+[OpenFreeMap](https://openfreemap.org) in the [OpenMapTiles](https://openmaptiles.org) schema; routing by
+[OSRM](https://project-osrm.org) on servers run by [FOSSGIS e.V.](https://www.fossgis.de) and the OSRM demo;
+place search by [Photon](https://photon.komoot.io) (komoot). In the app: Settings → About → Data & licences.
+
+## Contact
+
+[contact]
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).

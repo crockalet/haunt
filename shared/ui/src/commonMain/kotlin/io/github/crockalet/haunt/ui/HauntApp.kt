@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazePerformanceMode
@@ -53,10 +54,14 @@ import io.github.crockalet.haunt.ui.map.HauntMap
 import io.github.crockalet.haunt.ui.platform.PlatformBackHandler
 import io.github.crockalet.haunt.ui.screens.ActivityLogScreen
 import io.github.crockalet.haunt.ui.screens.ConnectAgentCommand
+import io.github.crockalet.haunt.ui.screens.DataLicencesActions
+import io.github.crockalet.haunt.ui.screens.DataLicencesScreen
+import io.github.crockalet.haunt.ui.screens.DataLicencesUiState
 import io.github.crockalet.haunt.ui.screens.DetectedUi
 import io.github.crockalet.haunt.ui.screens.LibraryActions
 import io.github.crockalet.haunt.ui.screens.LibraryScreen
 import io.github.crockalet.haunt.ui.screens.LibraryUiState
+import io.github.crockalet.haunt.ui.screens.LicenceTextScreen
 import io.github.crockalet.haunt.ui.screens.MapActions
 import io.github.crockalet.haunt.ui.screens.MapScreen
 import io.github.crockalet.haunt.ui.screens.OnboardingActions
@@ -188,7 +193,8 @@ private val Screen.depth: Int
     get() = when (this) {
         Screen.Map -> 0
         Screen.Search, Screen.Library, Screen.Settings -> 1
-        Screen.ActivityLog, Screen.Service -> 2
+        Screen.ActivityLog, Screen.Service, Screen.DataLicences -> 2
+        Screen.LicenceText -> 3
     }
 
 /** The map alone in its own scope: engine ticks recompose it (and [MapLayer]), not the whole app. */
@@ -270,6 +276,9 @@ private fun Sheet(
     val holder = state.map
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
+    // No browser (or a malformed URL) mustn't crash the app over a credits link.
+    val openUrl: (String) -> Unit = { url -> runCatching { uriHandler.openUri(url) } }
     when (screen) {
         Screen.Search -> Search(state, data, parseCoordinates) { clipboard.getText()?.text }
         Screen.Library -> LibraryScreen(
@@ -324,8 +333,20 @@ private fun Sheet(
                 onUnits = { state.updateDefaults(data) { it.copy(metric = !it.metric) } },
                 onJoystickSize = { state.updateDefaults(data) { d -> d.copy(joystickSize = d.joystickSize.next(JoystickSize.entries)) } },
                 onFloatingJoystick = { on -> state.updateDefaults(data) { it.copy(floatingJoystick = on) } },
+                onDataLicences = { state.navigate(Screen.DataLicences) },
             ),
         )
+        Screen.DataLicences -> DataLicencesScreen(
+            state = DataLicencesUiState(data.openSource, data.appVersion, data.loadNotice),
+            actions = DataLicencesActions(
+                onBack = { state.back() },
+                onOpenUrl = openUrl,
+                onOpenDoc = state::openLicenceDoc,
+            ),
+        )
+        Screen.LicenceText -> state.licenceDoc?.let { doc ->
+            LicenceTextScreen(doc, onBack = { state.back() }, onOpenUrl = openUrl)
+        }
         Screen.ActivityLog -> ActivityLogScreen(
             log = data.activityLog,
             onBack = { state.back() },
