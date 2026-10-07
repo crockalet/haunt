@@ -1,0 +1,6 @@
+{
+  "projectId": "e4aa8a2e-ac4e-42b2-8a16-e78c4e11e5e9",
+  "shape": "tokens-only",
+  "buildCmd": "node .design-sync/build.mjs",
+  "readmeHeader": ".design-sync/conventions.md"
+}
