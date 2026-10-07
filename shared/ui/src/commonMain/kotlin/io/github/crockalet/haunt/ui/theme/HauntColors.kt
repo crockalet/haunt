@@ -21,10 +21,14 @@ data class HauntColors(
     val mapLabel: Color,
     // Surfaces.
     val glass: Color,
-    /** Opaque-ish glass used when blur is unavailable. */
+    /** Denser [glass] for when there is no live blur behind it, so text stays legible over a sharp map. */
+    val glassSolid: Color,
+    /** Opaque-ish glass for controls that must not show the map through them (e.g. a disabled button). */
     val glassFallback: Color,
     val glassBorder: Color,
     val scrim: Color,
+    /** Denser [scrim] for the veil behind sheets when there is no live blur. */
+    val scrimSolid: Color,
     val tile: Color,
     val tabOn: Color,
     val hair: Color,
@@ -56,9 +60,11 @@ val LightHauntColors = HauntColors(
     majorRoad = Color(0xFFFFFFFF),
     mapLabel = Color(0xFF8D8D94),
     glass = Color(255, 255, 255, (0.62f * 255).toInt()),
+    glassSolid = Color(255, 255, 255, (0.76f * 255).toInt()),
     glassFallback = Color(0xF2F7F7F8),
     glassBorder = Color(255, 255, 255, (0.75f * 255).toInt()),
     scrim = Color(238, 240, 243, (0.70f * 255).toInt()),
+    scrimSolid = Color(238, 240, 243, (0.85f * 255).toInt()),
     tile = Color(16, 19, 24, (0.05f * 255).toInt()),
     tabOn = Color(0xFFFFFFFF),
     hair = Color(16, 19, 24, (0.08f * 255).toInt()),
@@ -86,9 +92,11 @@ val DarkHauntColors = HauntColors(
     majorRoad = Color(0xFF2E2E33),
     mapLabel = Color(0xFF74747C),
     glass = Color(30, 32, 38, (0.58f * 255).toInt()),
+    glassSolid = Color(30, 32, 38, (0.76f * 255).toInt()),
     glassFallback = Color(0xF0222429),
     glassBorder = Color(255, 255, 255, (0.10f * 255).toInt()),
     scrim = Color(17, 18, 20, (0.72f * 255).toInt()),
+    scrimSolid = Color(17, 18, 20, (0.85f * 255).toInt()),
     tile = Color(255, 255, 255, (0.07f * 255).toInt()),
     tabOn = Color(255, 255, 255, (0.12f * 255).toInt()),
     hair = Color(255, 255, 255, (0.08f * 255).toInt()),

@@ -96,6 +96,8 @@ import kotlinx.coroutines.delay
  *   a reference point for short plus codes.
  * @param onThemeChange persist the theme override chosen in Settings.
  * @param onboardingActions drives onboarding when [HauntAppState.onboarding] is set.
+ * @param liveBlur blur the map behind glass (Haze). Only works when the map draws through Compose;
+ *   when false there is no blur source at all and glass uses denser tints instead.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -108,9 +110,10 @@ fun HauntApp(
     state: HauntAppState = rememberHauntAppState(controller),
     onThemeChange: (ThemeMode) -> Unit = {},
     onboardingActions: OnboardingActions = OnboardingActions(),
+    liveBlur: Boolean = true,
 ) {
     HauntTheme(state.theme) {
-        val haze = rememberHazeState()
+        val haze = if (liveBlur) rememberHazeState() else null
         val holder = state.map
         val colors = HauntTheme.colors
 
@@ -119,7 +122,7 @@ fun HauntApp(
         // Blur at reduced resolution: indistinguishable at these radii, far cheaper while things move.
         CompositionLocalProvider(LocalHazeState provides haze, LocalHazePerformanceMode provides HazePerformanceMode.Performance) {
             Box(modifier.fillMaxSize().background(colors.map)) {
-                MapBackground(holder, mapStyle, Modifier.fillMaxSize().hazeSource(haze))
+                MapBackground(holder, mapStyle, Modifier.fillMaxSize().then(if (haze != null) Modifier.hazeSource(haze) else Modifier))
 
                 val onboarding = state.onboarding
                 if (onboarding != null) {

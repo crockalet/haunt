@@ -68,11 +68,12 @@ class Screenshots {
         local: LocalUiState = LocalUiState(),
         screen: Screen = Screen.Map,
         onboarding: OnboardingUiState? = null,
+        liveBlur: Boolean = true,
         configure: (HauntAppState) -> Unit = {},
     ) {
         val controller = FakeHauntController(engine, clock = { t0 })
         val state = HauntAppState(controller, screen, mode, local, onboarding = onboarding).also(configure)
-        HauntApp(controller = controller, data = HauntAppData.Sample, state = state)
+        HauntApp(controller = controller, data = HauntAppData.Sample, state = state, liveBlur = liveBlur)
     }
 
     private val holding = HauntState.Holding(fix(SampleData.ShibuyaCrossing), "Shibuya Crossing")
@@ -163,6 +164,20 @@ class Screenshots {
                 s.editService(HauntAppData.DefaultServices.single { e -> e.kind == ServiceKind.Routing })
                 s.serviceProfile = "foot"
             }
+        }
+    }
+
+    /** Android's glass: no live blur, denser tints over the sharp map. Not part of docs/screenshots. */
+    @Test
+    fun noBlur() {
+        shot("noblur-01-map-pin") { App(it, holding, pinLocal, liveBlur = false) }
+        shot("noblur-04-map-route-expanded") { App(it, moving, routeLocal.copy(expanded = true), liveBlur = false) }
+        shot("noblur-05-map-joystick") { App(it, joystick, joyLocal, liveBlur = false) }
+        shot("noblur-07-search") {
+            App(it, holding, pinLocal, Screen.Search, liveBlur = false) { s -> s.searchQuery = "35°39'34\"N 139°42'02\"E" }
+        }
+        shot("noblur-08-library") {
+            App(it, holding, pinLocal, Screen.Library, liveBlur = false) { s -> s.libraryTab = LibraryTab.Favourites }
         }
     }
 

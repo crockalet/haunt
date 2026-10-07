@@ -226,6 +226,8 @@ class MainActivity : ComponentActivity() {
             state = state,
             onThemeChange = { mode -> runtime.updateSettings { it.copy(theme = UiMapping.theme(mode)) } },
             onboardingActions = onboardingActions(state, inputs?.let(OnboardingFlow::step)),
+            // MapLibre draws into a SurfaceView, which Haze can't capture: blur would only cost offscreen layers.
+            liveBlur = false,
         )
     }
 
