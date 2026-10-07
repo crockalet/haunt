@@ -305,7 +305,8 @@ and take their colours from the theme palette.
 
 **Map screen** (single main screen; map takes the full screen, no bottom nav)
 - Top: glass search pill (places + coordinate paste) with Library and Settings buttons, right under the status bar
-  (no app title); a status chip below it.
+  (no app title), with a 52 dp glass status dot on its left: accent while faking, `danger` red while not (it lines
+  up with the search screen's back button through the pill morph); a status chip below it.
 - Bottom, **collapsed by default:** a floating toolbar with **Pin · Route · Joystick**
   (+ pause while a route plays) and an expand arrow, plus a separate round **Start / Stop** button.
 - **Starting and stopping are always explicit.** Switching mode, long-pressing the map, picking a search

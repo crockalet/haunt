@@ -327,7 +327,7 @@ internal fun buildMapUiState(
         active = active,
         startAction = startAction,
         status = status,
-        searchPlaceholder = if (local.mode == MapMode.Route) "Add a stop" else "Search or paste coordinates",
+        searchPlaceholder = if (local.mode == MapMode.Route) "Add a stop" else "Search or paste coords",
         pin = pin,
         route = route,
         joystick = joystick,

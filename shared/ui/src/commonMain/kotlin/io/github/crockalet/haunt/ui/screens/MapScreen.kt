@@ -3,6 +3,7 @@ package io.github.crockalet.haunt.ui.screens
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.BasicText
@@ -57,6 +59,7 @@ import io.github.crockalet.haunt.ui.components.Chip
 import io.github.crockalet.haunt.ui.components.DetailsCard
 import io.github.crockalet.haunt.ui.components.Dot
 import io.github.crockalet.haunt.ui.components.GlassIconButton
+import io.github.crockalet.haunt.ui.components.GlassSurface
 import io.github.crockalet.haunt.ui.components.GlassToolbar
 import io.github.crockalet.haunt.ui.components.IconButton
 import io.github.crockalet.haunt.ui.components.JoystickGrip
@@ -143,14 +146,17 @@ fun MapScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            SearchPill(
-                placeholder = state.searchPlaceholder,
-                leadingIcon = if (state.mode == MapMode.Route) HauntIcons.Plus else HauntIcons.Search,
-                onClick = actions.onSearch,
-                onLibrary = actions.onLibrary,
-                onSettings = actions.onSettings,
-                modifier = Modifier.morph(MorphKeys.Search),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(state.active)
+                SearchPill(
+                    placeholder = state.searchPlaceholder,
+                    leadingIcon = if (state.mode == MapMode.Route) HauntIcons.Plus else HauntIcons.Search,
+                    onClick = actions.onSearch,
+                    onLibrary = actions.onLibrary,
+                    onSettings = actions.onSettings,
+                    modifier = Modifier.weight(1f).morph(MorphKeys.Search),
+                )
+            }
             // Glass is a live blur of the map: fade or move it, never scale it (a scaled blur is
             // re-captured and re-blurred at every frame of the animation).
             AnimatedVisibility(
@@ -247,6 +253,20 @@ private fun StartStop(state: MapUiState, actions: MapActions) {
         StartButton(onClick = actions.onStart, enabled = start != null, contentDescription = start ?: "Start haunting")
     } else {
         StopButton(onClick = actions.onStop, contentDescription = stopLabel)
+    }
+}
+
+/** Glass disc beside the search pill: accent while faking, red while the real location shows. */
+@Composable
+private fun StatusDot(active: Boolean) {
+    val c = HauntTheme.colors
+    val color by animateColorAsState(if (active) c.accent else c.danger, HauntMotion.snappy())
+    val description = if (active) "Faking location" else "Not faking location"
+    GlassSurface(
+        Modifier.size(52.dp).semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Dot(color, size = 14.dp)
     }
 }
 
