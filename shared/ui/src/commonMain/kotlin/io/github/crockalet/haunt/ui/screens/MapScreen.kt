@@ -211,12 +211,11 @@ fun MapScreen(
                 }
             }
             val density = LocalDensity.current
-            val locateClearance = if (actions.onLocate != null) LocateButtonSize + LocateButtonGap else 0.dp
             Row(
                 Modifier.fillMaxWidth().onGloballyPositioned { toolbar ->
                     // Measured from the window bottom, which is also the map's (it fills the window).
                     val fromBottom = toolbar.findRootCoordinates().size.height - toolbar.boundsInRoot().top
-                    actions.onBottomChrome(with(density) { fromBottom.toDp() } + locateClearance)
+                    actions.onBottomChrome(with(density) { fromBottom.toDp() })
                 },
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,

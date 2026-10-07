@@ -28,7 +28,7 @@ class OpenSourceLicencesTest {
 
     @Test
     fun parsesAboutLibrariesExport() {
-        val info = OpenSourceLicences.parse(json, listOf("maplibre-native-c/rust.md", "", "android-ndk/NOTICE"))
+        val info = OpenSourceLicences.parse(json, listOf("maplibre-native-c/rust.md", "", "maplibre-native-c/icu.txt"))
         assertEquals(3, info.libraries.size)
         val ffi = info.libraries[1]
         assertEquals("0.202609.5", ffi.version)
@@ -38,7 +38,7 @@ class OpenSourceLicencesTest {
         // JavaCPP is shipped under Apache-2.0, the alternative whose text is bundled.
         val javacpp = info.groups.single { g -> g.libraries.any { it.name == "JavaCPP" } }
         assertEquals("Apache-2.0", javacpp.licence.id)
-        assertEquals(listOf("Rust crates", "Android NDK C++ runtime"), info.notices.map { it.title })
+        assertEquals(listOf("Rust crates", "ICU"), info.notices.map { it.title })
     }
 
     @Test

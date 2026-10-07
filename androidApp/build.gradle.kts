@@ -122,6 +122,8 @@ abstract class CollectNoticesTask : DefaultTask() {
             ZipFile(archive).use { zip ->
                 zip.entries().asSequence()
                     .filter { !it.isDirectory && it.name.startsWith("META-INF/licenses/") }
+                    // libc++ is Apache-2.0 WITH LLVM-exception: no notice needed when embedded in object form.
+                    .filter { !it.name.startsWith("META-INF/licenses/android-ndk/") }
                     .sortedBy { it.name }
                     .forEach { write(it.name.removePrefix("META-INF/licenses/"), zip.getInputStream(it).readBytes()) }
                 val json = zip.getEntry("third_party_licenses.json")

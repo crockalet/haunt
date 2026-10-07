@@ -108,13 +108,3 @@ object DataCredits {
 
     val all: List<CreditSection> = listOf(Map, Routing, Search)
 }
-
-/** Fonts bundled in shared/ui, with their licence files under composeResources/files/licenses. */
-object BundledFonts {
-    const val OFL = "SIL Open Font License 1.1"
-
-    val all: List<Pair<String, String>> = listOf(
-        "Plus Jakarta Sans" to "files/licenses/OFL-PlusJakartaSans.txt",
-        "JetBrains Mono" to "files/licenses/OFL-JetBrainsMono.txt",
-    )
-}

@@ -121,8 +121,8 @@ class AttributionState(expanded: Boolean = true) {
 }
 
 /**
- * The map's credit line in the bottom-right corner, [bottomInset] up from the window bottom (clear of
- * the toolbar and locate button). Drawn on solid glass: the map behind it may be a SurfaceView.
+ * The map's credit line in the bottom-left corner, [bottomInset] up from the window bottom (clear of
+ * the toolbar). Drawn on solid glass: the map behind it may be a SurfaceView.
  */
 @Composable
 internal fun MapAttributionOverlay(links: List<AttributionLink>, state: AttributionState, bottomInset: Dp) {
@@ -136,7 +136,7 @@ internal fun MapAttributionOverlay(links: List<AttributionLink>, state: Attribut
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .then(bottom)
             .padding(start = 12.dp, end = 12.dp),
-        contentAlignment = Alignment.BottomEnd,
+        contentAlignment = Alignment.BottomStart,
     ) {
         CompositionLocalProvider(LocalGlassMode provides GlassMode.Solid) {
             MapAttribution(links, state)
@@ -161,17 +161,6 @@ fun MapAttribution(links: List<AttributionLink>, state: AttributionState, modifi
     // Swallows drags so they don't pan the map underneath.
     GlassSurface(modifier.pointerInput(Unit) {}) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            AnimatedVisibility(
-                state.expanded,
-                enter = fadeIn(HauntMotion.snappy()) + expandHorizontally(HauntMotion.smooth(), expandFrom = Alignment.End),
-                exit = fadeOut(HauntMotion.snappy()) + shrinkHorizontally(HauntMotion.smooth(), shrinkTowards = Alignment.End),
-            ) {
-                BasicText(
-                    text,
-                    Modifier.widthIn(max = 280.dp).padding(start = 14.dp, top = 8.dp, bottom = 8.dp),
-                    style = HauntTheme.type.small.copy(color = c.text),
-                )
-            }
             IconButton(
                 HauntIcons.Info,
                 if (state.expanded) "Hide map credits" else "Map credits",
@@ -180,6 +169,17 @@ fun MapAttribution(links: List<AttributionLink>, state: AttributionState, modifi
                 iconSize = 18.dp,
                 tint = c.text,
             )
+            AnimatedVisibility(
+                state.expanded,
+                enter = fadeIn(HauntMotion.snappy()) + expandHorizontally(HauntMotion.smooth(), expandFrom = Alignment.Start),
+                exit = fadeOut(HauntMotion.snappy()) + shrinkHorizontally(HauntMotion.smooth(), shrinkTowards = Alignment.Start),
+            ) {
+                BasicText(
+                    text,
+                    Modifier.widthIn(max = 280.dp).padding(end = 14.dp, top = 8.dp, bottom = 8.dp),
+                    style = HauntTheme.type.small.copy(color = c.text),
+                )
+            }
         }
     }
 }

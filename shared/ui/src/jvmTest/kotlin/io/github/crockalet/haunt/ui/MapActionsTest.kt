@@ -80,7 +80,7 @@ class MapActionsTest {
     }
 
     @Test
-    fun mapBottomInsetClearsTheToolbarAndLocateButton() {
+    fun mapBottomInsetClearsTheToolbar() {
         var failure: Throwable? = null
         SwingUtilities.invokeAndWait {
             failure = runCatching {
@@ -94,7 +94,8 @@ class MapActionsTest {
                 val toolbarOnly = inset(HauntAppData())
                 // Toolbar row (≥ 40 dp) plus the 18 dp bottom margin, well under the screen height.
                 assertTrue(toolbarOnly in 58.dp..200.dp, "inset $toolbarOnly")
-                assertEquals(toolbarOnly + 64.dp, inset(HauntAppData(locateMe = { a })))
+                // The credits sit bottom-left, so the bottom-right locate button doesn't push them up.
+                assertEquals(toolbarOnly, inset(HauntAppData(locateMe = { a })))
             }.exceptionOrNull()
         }
         failure?.let { throw it }

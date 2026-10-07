@@ -25,9 +25,7 @@ import io.github.crockalet.haunt.ui.components.ListRow
 import io.github.crockalet.haunt.ui.components.RowDivider
 import io.github.crockalet.haunt.ui.components.SectionHeader
 import io.github.crockalet.haunt.ui.components.Text
-import io.github.crockalet.haunt.ui.generated.Res
 import io.github.crockalet.haunt.ui.icons.HauntIcons
-import io.github.crockalet.haunt.ui.state.BundledFonts
 import io.github.crockalet.haunt.ui.state.Credit
 import io.github.crockalet.haunt.ui.state.CreditSection
 import io.github.crockalet.haunt.ui.state.DataCredits
@@ -106,18 +104,6 @@ fun DataLicencesScreen(state: DataLicencesUiState, actions: DataLicencesActions,
                         DocRow(n.title, n.subtitle ?: n.path) {
                             actions.onOpenDoc(LicenceDoc(n.title, n.subtitle) { state.loadNotice(n.path) })
                         }
-                    }
-                }
-            }
-        }
-
-        Column {
-            SectionHeader("Fonts")
-            ListGroup {
-                BundledFonts.all.forEachIndexed { i, (name, path) ->
-                    if (i > 0) RowDivider()
-                    DocRow(name, BundledFonts.OFL) {
-                        actions.onOpenDoc(LicenceDoc(name, BundledFonts.OFL) { Res.readBytes(path).decodeToString() })
                     }
                 }
             }

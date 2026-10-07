@@ -156,7 +156,6 @@ object SampleData {
                 notices = listOf(
                     OssNotice("MapLibre Native", "maplibre-native-c/maplibre-native.md", "MapLibre Native and its components"),
                     OssNotice("Rust components", "maplibre-native-c/rust.md", "Rust crates in MapLibre Native FFI"),
-                    OssNotice("Android NDK", "android-ndk/NOTICE", "C++ runtime"),
                 ),
             )
         }

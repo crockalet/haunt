@@ -83,7 +83,6 @@ object OpenSourceLicences {
         "maplibre-native-c/fastpfor.txt" to ("FastPFor" to "Used by MapLibre Native"),
         "maplibre-native-c/nunicode.txt" to ("nunicode" to "Used by MapLibre Native"),
         "maplibre-native-c/pmtiles.txt" to ("PMTiles" to "Used by MapLibre Native"),
-        "android-ndk/NOTICE" to ("Android NDK C++ runtime" to "Built into MapLibre Native"),
         "google-play-services/third_party_licenses.txt" to ("Google Play services" to "Third-party notices"),
     )
 
