@@ -1,0 +1,9 @@
+{
+  "name": "haunt",
+  "description": "Skill for driving Haunt, the open-source fake GPS app for Android, from coding agents over adb",
+  "author": { "name": "crockalet" },
+  "homepage": "https://github.com/crockalet/haunt",
+  "repository": "https://github.com/crockalet/haunt",
+  "license": "GPL-3.0-or-later",
+  "keywords": ["android", "adb", "gps", "mock-location", "fake-gps", "testing"]
+}

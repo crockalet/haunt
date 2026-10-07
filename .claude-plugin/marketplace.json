@@ -1,0 +1,11 @@
+{
+  "name": "haunt",
+  "owner": { "name": "crockalet" },
+  "plugins": [
+    {
+      "name": "haunt",
+      "source": "./",
+      "description": "Mock an Android device's GPS location over adb with Haunt: teleport, routes, GPX/KML playback"
+    }
+  ]
+}
