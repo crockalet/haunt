@@ -46,10 +46,11 @@ class FakeGeocoder(var places: Map<String, Place> = emptyMap(), var fail: Boolea
     }
 }
 
-class FakeRouter(var fail: Boolean = false) : Router {
+class FakeRouter(var fail: Boolean = false, var failWith: Exception? = null) : Router {
     val calls = mutableListOf<List<LatLng>>()
     override suspend fun route(waypoints: List<LatLng>): RoutedPath {
         calls += waypoints
+        failWith?.let { throw it }
         if (fail) throw RoutingException("Routing failed: NoRoute")
         // A detour via a midpoint shifted east.
         val a = waypoints.first()

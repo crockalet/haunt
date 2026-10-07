@@ -19,6 +19,8 @@ import io.github.crockalet.haunt.core.currentFix
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -45,8 +47,14 @@ class MapStateHolder(
     private val commands: HauntCommands = ControllerCommands(controller),
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
 ) {
-    var local by mutableStateOf(initial)
-        private set
+    private var localState by mutableStateOf(initial)
+
+    var local: LocalUiState
+        get() = localState
+        private set(value) {
+            localState = value
+            refreshRoads(value)
+        }
     var defaults by mutableStateOf(defaults)
 
     /** Banner over the map (errors with a hint, routing warnings…); null when nothing to say. */
@@ -71,6 +79,14 @@ class MapStateHolder(
 
     private fun measure(points: List<LatLng>): MeasuredLine =
         measured?.takeIf { it.points == points } ?: MeasuredLine(points).also { measured = it }
+
+    /** Stops the road preview is (being) fetched for; null when none is wanted. */
+    private var roadsTarget: List<LatLng>? = null
+    private var roadsJob: Job? = null
+
+    init {
+        refreshRoads(initial)
+    }
 
     private val shownState = derivedStateOf(structuralEqualityPolicy()) { buildMapUiState(engine, local, defaults, ::measure) }
     private val mapContentState = derivedStateOf(structuralEqualityPolicy()) { shownState.value.map }
@@ -286,10 +302,14 @@ class MapStateHolder(
             // Recorded tracks already follow their path; only hand-placed stops get routed.
             followRoads = local.followRoads && track == null,
             playbackRate = if (timed) local.rate.toDouble() else null,
+            routed = local.currentRoads()?.points,
         )
         launchCommand {
             val outcome = commands.playRoute(request)
-            local = local.copy(playingRoute = outcome.points)
+            val stops = request.route.points
+            // Keep the routed line on the map once the route ends, too.
+            val roads = if (request.followRoads && request.routed == null && local.draftRoute == stops) RoadsPreview(stops, outcome.points) else local.roads
+            local = local.copy(playingRoute = outcome.points, roads = roads)
             outcome.warning?.let { showNotice(Notice(it, error = false)) }
         }
     }
@@ -314,6 +334,34 @@ class MapStateHolder(
 
     fun setFollowRoads(follow: Boolean) {
         local = local.copy(followRoads = follow)
+    }
+
+    /**
+     * Keeps [LocalUiState.roads] in step with the draft: whenever the stops (or Follow roads) change
+     * in Route mode, fetch the road-following line after a short pause, cancelling any older fetch.
+     */
+    private fun refreshRoads(l: LocalUiState) {
+        if (!commands.canFollowRoads) return
+        val stops = l.draftRoute.takeIf { l.mode == MapMode.Route && l.followsRoads }
+        if (stops == roadsTarget) return
+        roadsTarget = stops
+        roadsJob?.cancel()
+        roadsJob = null
+        if (stops == null || l.roads?.let { it.stops == stops && it.points != null } == true) return
+        localState = l.copy(roads = RoadsPreview(stops))
+        roadsJob = scope.launch {
+            delay(ROADS_DEBOUNCE_MILLIS)
+            val result = try {
+                RoadsPreview(stops, points = commands.routeAlongRoads(stops))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RoadsPreview(stops, error = e.message ?: "Couldn't follow roads")
+            }
+            if (roadsTarget != stops) return@launch
+            local = local.copy(roads = result)
+            if (result.error != null) showNotice(Notice(result.error, ROADS_HINT))
+        }
     }
 
     /** Changes the loop mode; a playing route keeps going from where it is. */
@@ -381,6 +429,11 @@ class MapStateHolder(
     companion object {
         /** Range of the Custom speed editor (km/h). */
         val CustomSpeedRangeKmh = 1f..150f
+
+        /** Pause after the last stop edit before the road preview is fetched. */
+        const val ROADS_DEBOUNCE_MILLIS = 400L
+
+        const val ROADS_HINT = "Turn off Follow roads to use straight lines, or check the routing server in Settings"
     }
 }
 
