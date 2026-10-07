@@ -11,6 +11,7 @@ import io.github.crockalet.haunt.android.ui.OnboardingFlow
 import io.github.crockalet.haunt.android.ui.OnboardingInputs
 import io.github.crockalet.haunt.android.ui.UiMapping
 import io.github.crockalet.haunt.android.control.AndroidHauntApi
+import io.github.crockalet.haunt.android.net.HttpException
 import io.github.crockalet.haunt.android.ui.AndroidCommands
 import io.github.crockalet.haunt.core.HauntState
 import io.github.crockalet.haunt.core.LatLng
@@ -32,6 +33,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import java.net.UnknownHostException
 import java.nio.file.Files
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -237,12 +239,38 @@ class AndroidCommandsTest {
     }
 
     @Test
-    fun routingFailureFallsBackWithAWarning() = runTest {
-        val (c, _) = commands()
+    fun routingFailureIsAnErrorNotAStraightLine() = runTest {
+        val (c, h) = commands()
         router.fail = true
-        val out = c.playRoute(request(Route(listOf(a, b)), followRoads = true))
-        assertEquals(listOf(a, b), out.points)
-        assertTrue(out.warning!!.contains("straight lines"))
+        val e = assertFailsWith<CommandException> { c.playRoute(request(Route(listOf(a, b)), followRoads = true)) }
+        assertTrue(e.message!!.startsWith("Couldn't follow roads"))
+        assertTrue(e.hint!!.contains("Follow roads"))
+        assertEquals(HauntState.Idle, h.controller.state.value)
+        assertEquals(0, env.started)
+    }
+
+    @Test
+    fun previewedLineIsPlayedWithoutRoutingAgain() = runTest {
+        val (c, h) = commands()
+        val routed = listOf(a, LatLng(35.001, 139.005), b)
+        val out = c.playRoute(request(Route(listOf(a, b)), followRoads = true).copy(routed = routed))
+        assertEquals(routed, out.points)
+        assertTrue(router.calls.isEmpty())
+        assertIs<HauntState.Moving>(h.controller.state.value)
+    }
+
+    @Test
+    fun routeAlongRoadsForThePreview() = runTest {
+        val (c, h) = commands()
+        assertTrue(c.canFollowRoads)
+        assertEquals(3, c.routeAlongRoads(listOf(a, b)).size)
+        assertEquals(HauntState.Idle, h.controller.state.value) // previewing doesn't start faking
+        assertEquals(0, env.started)
+
+        router.failWith = UnknownHostException("router.project-osrm.org")
+        assertEquals("Couldn't follow roads: can't reach the routing server", assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b)) }.message)
+        router.failWith = HttpException(429, "HTTP 429 from router.project-osrm.org")
+        assertTrue(assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b)) }.message!!.contains("busy"))
     }
 
     @Test

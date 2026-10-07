@@ -61,6 +61,9 @@ data class RouteDetails(
     val customKmh: Float,
     val playing: Boolean,
     val canPlay: Boolean,
+    /** Under the Follow roads switch: "Finding roads…" or why routing failed; null when there's nothing to say. */
+    val roadsNote: String? = null,
+    val roadsFailed: Boolean = false,
 )
 
 @Immutable
@@ -109,6 +112,8 @@ data class LocalUiState(
     val draftTrack: Route? = null,
     /** Polyline actually being played (road-following), drawn instead of the stops while moving. */
     val playingRoute: List<LatLng>? = null,
+    /** Road-following line for the draft's stops while Follow roads is on (see [currentRoads]). */
+    val roads: RoadsPreview? = null,
     val speedPreset: SpeedPreset = SpeedPreset.Walk,
     val customSpeed: Speed = Speed.kmh(30.0),
     val followRoads: Boolean = true,
@@ -132,6 +137,21 @@ data class LocalUiState(
 )
 
 fun LocalUiState.presetSpeed(): Speed = speedPreset.speed ?: customSpeed
+
+/** Road-following line through [stops]: loading while both [points] and [error] are null. */
+@Immutable
+data class RoadsPreview(
+    val stops: List<LatLng>,
+    val points: List<LatLng>? = null,
+    val error: String? = null,
+)
+
+/** The draft's stops get routed along roads (hand-placed stops only; recorded tracks keep their path). */
+val LocalUiState.followsRoads: Boolean
+    get() = followRoads && draftTrack == null && draftRoute.size >= 2
+
+/** [LocalUiState.roads] if it's for the current stops and Follow roads is on. */
+fun LocalUiState.currentRoads(): RoadsPreview? = roads?.takeIf { followsRoads && it.stops == draftRoute }
 
 /** Pure mapping from engine state + local UI state to [MapUiState]. */
 fun buildMapUiState(
@@ -176,9 +196,11 @@ internal fun buildMapUiState(
         )
     } else null
 
+    val roads = local.currentRoads()
+    val draftLine = roads?.points ?: local.draftRoute
     val route = if (local.mode == MapMode.Route) {
         val moving = engine as? HauntState.Moving
-        val total = moving?.progress?.totalMeters ?: measure(local.draftRoute).length
+        val total = moving?.progress?.totalMeters ?: measure(draftLine).length
         val traveled = moving?.progress?.traveledMeters ?: 0.0
         val speed = moving?.speed ?: local.presetSpeed()
         RouteDetails(
@@ -199,6 +221,8 @@ internal fun buildMapUiState(
             customKmh = local.customSpeed.kmh.toFloat(),
             playing = moving != null && !moving.paused,
             canPlay = moving != null || local.draftRoute.size >= 2,
+            roadsNote = roads?.let { it.error ?: if (it.points == null) "Finding roads…" else null },
+            roadsFailed = roads?.error != null,
         )
     } else null
 
@@ -236,7 +260,7 @@ internal fun buildMapUiState(
     val routePoints = when {
         local.mode != MapMode.Route -> emptyList()
         moving != null && (local.playingRoute?.size ?: 0) >= 2 -> local.playingRoute!!
-        else -> local.draftRoute
+        else -> draftLine
     }
     val traveledPoints = if (moving != null && routePoints.size >= 2) {
         measure(routePoints).traveled(moving.progress.traveledMeters)

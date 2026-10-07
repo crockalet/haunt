@@ -16,6 +16,8 @@ data class RouteRequest(
     val followRoads: Boolean,
     /** Non-null for a recorded track: replay it by its timestamps at this multiplier. */
     val playbackRate: Double?,
+    /** Road-following line already fetched for these stops (the map's preview); routed again when null. */
+    val routed: List<LatLng>? = null,
 )
 
 /** What was actually played: the (possibly road-following) polyline and an optional warning. */
@@ -36,6 +38,15 @@ interface HauntCommands {
     suspend fun setLocation(position: LatLng, accuracy: Float?, label: String?)
 
     suspend fun playRoute(request: RouteRequest): RouteOutcome
+
+    /** Whether [routeAlongRoads] works; without it the map previews straight lines between stops. */
+    val canFollowRoads: Boolean get() = false
+
+    /**
+     * The road-following line through [stops], for the map's preview while stops are edited.
+     * Throws (with a message worth showing) when no route could be computed.
+     */
+    suspend fun routeAlongRoads(stops: List<LatLng>): List<LatLng> = stops
 }
 
 /** Calls the controller directly (previews, tests, desktop). Straight lines only. */

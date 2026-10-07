@@ -21,8 +21,13 @@ import io.github.crockalet.haunt.ui.state.Track
 import io.github.crockalet.haunt.ui.state.Geo
 import io.github.crockalet.haunt.ui.state.MeasuredLine
 import io.github.crockalet.haunt.ui.state.buildMapUiState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -337,6 +342,105 @@ class HolderTest {
         assertEquals(Notice("Haunt is faking your location right now", "Stop haunting first."), holder.notice)
         assertEquals(false, holder.local.locating)
         assertTrue(buildMapUiState(HauntState.Idle, holder.local).locating.not())
+    }
+}
+
+/** Routes along "roads" by adding a detour point after every stop; can be made to fail. */
+private class RoadCommands : HauntCommands {
+    val routed = mutableListOf<List<LatLng>>()
+    val played = mutableListOf<RouteRequest>()
+    var failWith: Exception? = null
+
+    override suspend fun setLocation(position: LatLng, accuracy: Float?, label: String?) = Unit
+
+    override suspend fun playRoute(request: RouteRequest): RouteOutcome {
+        played += request
+        return RouteOutcome(request.routed ?: routeAlongRoads(request.route.points))
+    }
+
+    override val canFollowRoads: Boolean get() = true
+
+    override suspend fun routeAlongRoads(stops: List<LatLng>): List<LatLng> {
+        routed += stops
+        failWith?.let { throw it }
+        return stops.flatMapIndexed { i, p -> if (i == stops.lastIndex) listOf(p) else listOf(p, LatLng(p.lat + 0.001, p.lng)) }
+    }
+}
+
+class RoadsPreviewTest {
+    private val a = LatLng(4.2105, 73.5395)
+    private val b = LatLng(4.2190, 73.5450)
+    private val c = LatLng(4.2220, 73.5410)
+
+    private fun TestScope.holder(commands: RoadCommands, local: LocalUiState = LocalUiState(mode = MapMode.Route)) =
+        MapStateHolder(RecordingController(), local, commands = commands, scope = CoroutineScope(StandardTestDispatcher(testScheduler)))
+
+    @Test
+    fun editingStopsDrawsTheRoutedLineAfterAPause() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands)
+        holder.onMapLongPress(a)
+        holder.onMapLongPress(b)
+        assertEquals("Finding roads…", holder.uiState.route?.roadsNote)
+        assertEquals(listOf(a, b), holder.uiState.map.route) // straight until the roads arrive
+        holder.onMapLongPress(c) // within the debounce: only the last edit is routed
+        advanceUntilIdle()
+        assertEquals(listOf(listOf(a, b, c)), commands.routed)
+        assertEquals(5, holder.uiState.map.route.size)
+        assertNull(holder.uiState.route?.roadsNote)
+        assertTrue(Geo.length(holder.uiState.map.route) > Geo.length(listOf(a, b, c)))
+    }
+
+    @Test
+    fun turningFollowRoadsOffShowsStraightLinesAndOnRoutesAgainOnlyIfNeeded() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        assertEquals(3, holder.uiState.map.route.size)
+        holder.setFollowRoads(false)
+        assertEquals(listOf(a, b), holder.uiState.map.route)
+        holder.setFollowRoads(true)
+        advanceUntilIdle()
+        assertEquals(3, holder.uiState.map.route.size)
+        assertEquals(1, commands.routed.size) // the cached line was still good
+    }
+
+    @Test
+    fun playUsesThePreviewedLineAndDoesNotStartWhilePreviewing() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        assertTrue(commands.played.isEmpty())
+        holder.playPause()
+        advanceUntilIdle()
+        val req = commands.played.single()
+        assertEquals(3, req.routed?.size)
+        assertEquals(1, commands.routed.size)
+    }
+
+    @Test
+    fun routingFailureIsShownNotHidden() = runTest {
+        val commands = RoadCommands().apply { failWith = CommandException("Couldn't follow roads: can't reach the routing server", "hint") }
+        val holder = holder(commands)
+        holder.onMapLongPress(a)
+        holder.onMapLongPress(b)
+        advanceUntilIdle()
+        val route = assertNotNull(holder.uiState.route)
+        assertEquals("Couldn't follow roads: can't reach the routing server", route.roadsNote)
+        assertTrue(route.roadsFailed)
+        assertEquals(Notice("Couldn't follow roads: can't reach the routing server", MapStateHolder.ROADS_HINT), holder.notice)
+        assertEquals(listOf(a, b), holder.uiState.map.route)
+    }
+
+    @Test
+    fun recordedTracksAndOtherModesAreNotRouted() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Pin, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        holder.loadTrack(Track("run", "GPX", listOf(a, b), Route(listOf(a, b), timestampsMillis = listOf(0L, 60_000L))))
+        advanceUntilIdle()
+        assertTrue(commands.routed.isEmpty())
+        assertNull(holder.uiState.route?.roadsNote)
     }
 }
 

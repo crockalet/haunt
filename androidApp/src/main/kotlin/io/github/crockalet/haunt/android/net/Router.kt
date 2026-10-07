@@ -66,7 +66,13 @@ object OsrmParser {
         val code = (root["code"] as? JsonPrimitive)?.content
         if (code != "Ok") {
             val message = (root["message"] as? JsonPrimitive)?.content
-            throw RoutingException("Routing failed: ${code ?: "no code"}${message?.let { " ($it)" } ?: ""}")
+            throw RoutingException(
+                when (code) {
+                    "NoRoute" -> "no road route between these stops"
+                    "NoSegment" -> "a stop is too far from any road"
+                    else -> "Routing failed: ${code ?: "no code"}${message?.let { " ($it)" } ?: ""}"
+                },
+            )
         }
         val route = (root["routes"] as? JsonArray)?.firstOrNull() as? JsonObject ?: throw RoutingException("Routing returned no route")
         val coordinates = ((route["geometry"] as? JsonObject)?.get("coordinates") as? JsonArray)
