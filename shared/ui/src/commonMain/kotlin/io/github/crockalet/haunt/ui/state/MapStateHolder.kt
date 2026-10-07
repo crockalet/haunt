@@ -15,10 +15,13 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.core.currentFix
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -29,9 +32,11 @@ import kotlin.math.roundToInt
  * route…). Feed it engine states with [onEngineState] (done by `rememberHauntAppState`) and read [shown]
  * from composition; [uiState] builds the same from the controller's current state.
  *
- * Starting to fake a location (pin, place, route) goes through [commands], which may suspend and
- * fail (permissions, mock app not selected…); failures become a [notice]. Live tweaks (pause,
- * speed, rate, loop, joystick) go straight to the [controller].
+ * Picking a spot, adding stops or switching mode only prepares: faking starts on [start] and ends
+ * on [stop], never as a side effect. Switching mode leaves whatever runs untouched until Start.
+ * Starting goes through [commands], which may suspend and fail (permissions, mock app not
+ * selected…); failures become a [notice]. Live tweaks (pause, speed, rate, loop, stick input) of
+ * what is running go straight to the [controller].
  *
  * @param scope runs [commands]; the default runs them synchronously until they suspend.
  */
@@ -43,9 +48,18 @@ class MapStateHolder(
     private val commands: HauntCommands = ControllerCommands(controller),
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
 ) {
-    var local by mutableStateOf(initial)
-        private set
+    private var localState by mutableStateOf(initial)
+
+    var local: LocalUiState
+        get() = localState
+        private set(value) {
+            localState = value
+            refreshRoads(value)
+        }
     var defaults by mutableStateOf(defaults)
+
+    /** Whether the floating joystick may draw over other apps; only shown next to its setting. */
+    var canDrawOverlays by mutableStateOf(true)
 
     /** Banner over the map (errors with a hint, routing warnings…); null when nothing to say. */
     var notice by mutableStateOf<Notice?>(null)
@@ -70,13 +84,24 @@ class MapStateHolder(
     private fun measure(points: List<LatLng>): MeasuredLine =
         measured?.takeIf { it.points == points } ?: MeasuredLine(points).also { measured = it }
 
-    private val shownState = derivedStateOf(structuralEqualityPolicy()) { buildMapUiState(engine, local, defaults, ::measure) }
+    /** Stops the road preview is (being) fetched for; null when none is wanted. */
+    private var roadsTarget: Pair<List<LatLng>, Travel>? = null
+    private var roadsJob: Job? = null
+
+    init {
+        refreshRoads(initial)
+    }
+
+    // `this.`: in an initializer a bare `defaults` is the constructor parameter, which never changes.
+    private val shownState = derivedStateOf(structuralEqualityPolicy()) {
+        buildMapUiState(engine, local, this.defaults, ::measure, canDrawOverlays)
+    }
     private val mapContentState = derivedStateOf(structuralEqualityPolicy()) { shownState.value.map }
     private val expandedState = derivedStateOf(structuralEqualityPolicy()) { local.expanded }
 
     /** Current UI state; reads engine state from [HauntController.state]. */
     val uiState: MapUiState
-        get() = buildMapUiState(controller.state.value, local, defaults, ::measure)
+        get() = buildMapUiState(controller.state.value, local, defaults, ::measure, canDrawOverlays)
 
     /** What the map screen shows (snapshot state): the last engine state passed to [onEngineState], plus [local]. */
     val shown: MapUiState
@@ -127,17 +152,7 @@ class MapStateHolder(
 
     fun selectMode(mode: MapMode) {
         if (mode == local.mode) return
-        val engine = controller.state.value
-        if (local.mode == MapMode.Joystick && engine is HauntState.Joystick) {
-            // Leaving joystick: hold where we are.
-            controller.setLocation(engine.fix.position, label = "Joystick stop")
-        }
         local = local.copy(mode = mode)
-        val start = engine.currentFix?.position ?: local.lastPosition
-        // With nowhere to start from, wait for a long-press or locate to place the stick.
-        if (mode == MapMode.Joystick && start != null) {
-            controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = start)
-        }
     }
 
     fun toggleExpanded() {
@@ -150,51 +165,37 @@ class MapStateHolder(
 
     // --- Pin ---------------------------------------------------------------------------------
 
-    /** Long-press on the map. Pin mode: haunt there. Route mode: add a stop. */
+    /** Long-press on the map. Pin mode: pick the spot. Route mode: add a stop. Joystick mode: where Start puts the stick. */
     fun onMapLongPress(position: LatLng) {
         local = local.copy(cameraOverride = null)
         when (local.mode) {
-            MapMode.Pin -> launchCommand { commands.setLocation(position, defaults.accuracyMeters, "Dropped pin") }
+            MapMode.Pin, MapMode.Joystick -> pickSpot(position, "Dropped pin")
             MapMode.Route -> addStop(position)
-            MapMode.Joystick -> controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = position)
         }
     }
 
-    /** Haunt a place (from search, library…): switches to Pin mode. */
-    fun hauntAt(position: LatLng, label: String?) {
+    /**
+     * A place from search or the library. Route mode (no route playing) adds it as a stop; otherwise
+     * it becomes the pending spot in Pin mode. Moves the camera to it. Nothing is haunted until [start].
+     */
+    fun pick(position: LatLng, label: String?) {
+        focus(position)
         if (local.mode == MapMode.Route && controller.state.value !is HauntState.Moving) {
             addStop(position)
             return
         }
         local = local.copy(mode = MapMode.Pin, cameraOverride = null)
-        launchCommand { commands.setLocation(position, defaults.accuracyMeters, label) }
+        pickSpot(position, label)
+    }
+
+    private fun pickSpot(position: LatLng, label: String?) {
+        local = local.copy(pendingSpot = position, pendingLabel = label)
     }
 
     /**
-     * "Start from where I am": [position] is the device's real location. Pin mode haunts it; joystick
-     * mode restarts the stick from it; route mode makes it the first stop (unless it already is).
-     * While a route plays it only moves the camera.
+     * Locate button: asks [locateMe] for the device's real location and moves the camera there.
+     * Never haunts anything. Ignored while one is running.
      */
-    fun useMyLocation(position: LatLng) {
-        when (local.mode) {
-            MapMode.Pin -> hauntAt(position, MY_LOCATION_LABEL)
-            MapMode.Joystick -> {
-                local = local.copy(cameraOverride = null, lastPosition = position)
-                controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = position)
-            }
-            MapMode.Route -> {
-                if (controller.state.value is HauntState.Moving) {
-                    showOnMap(position)
-                    return
-                }
-                val first = local.draftRoute.firstOrNull()
-                val draft = if (first != null && Geo.distance(first, position) < SAME_STOP_METERS) local.draftRoute else listOf(position) + local.draftRoute
-                local = local.copy(draftRoute = draft, draftName = null, draftTrack = null, cameraOverride = position)
-            }
-        }
-    }
-
-    /** Locate button: asks [locateMe] for the real location, then [useMyLocation]. Ignored while one is running. */
     fun locate(locateMe: suspend () -> LatLng) {
         if (local.locating) return
         local = local.copy(locating = true)
@@ -202,7 +203,10 @@ class MapStateHolder(
             try {
                 val position = locateMe()
                 local = local.copy(locating = false)
-                useMyLocation(position)
+                val engine = controller.state.value
+                // Otherwise the camera would snap straight back to the moving ghost.
+                if (engine is HauntState.Moving || engine is HauntState.Joystick) showOnMap(position)
+                focus(position)
             } catch (e: CancellationException) {
                 local = local.copy(locating = false)
                 throw e
@@ -216,6 +220,11 @@ class MapStateHolder(
     /** Move the camera to [position] without haunting it. */
     fun showOnMap(position: LatLng) {
         local = local.copy(cameraOverride = position)
+    }
+
+    /** Animate the camera to [position] once, even if it was the last focus too. */
+    private fun focus(position: LatLng) {
+        local = local.copy(cameraFocus = CameraFocus(position, (local.cameraFocus?.id ?: 0) + 1))
     }
 
     // --- Route -------------------------------------------------------------------------------
@@ -247,12 +256,47 @@ class MapStateHolder(
         )
     }
 
-    /** Pause / resume, or start the draft route when nothing is playing. */
+    /** Pause / resume the playing route. */
     fun playPause() {
-        when (val s = controller.state.value) {
-            is HauntState.Moving -> if (s.paused) controller.resume() else controller.pause()
-            else -> if (local.draftRoute.size >= 2) startRoute()
+        val s = controller.state.value as? HauntState.Moving ?: return
+        if (s.paused) controller.resume() else controller.pause()
+    }
+
+    // --- Start -------------------------------------------------------------------------------
+
+    /**
+     * The Start button: fakes what the selected mode has ready ([MapUiState.startAction]): the pending
+     * spot (or the last location) in Pin mode, the draft in Route mode, the stick from the pending
+     * spot or the current position in Joystick mode. Whatever ran before is replaced without a gap.
+     */
+    fun start() {
+        val engine = controller.state.value
+        if (buildMapUiState(engine, local, defaults, ::measure).startAction == null) return
+        val pending = local.pendingSpot
+        val position = engine.currentFix?.position ?: local.lastPosition
+        when (local.mode) {
+            MapMode.Pin -> {
+                val label = if (pending != null) local.pendingLabel else null
+                val at = pending ?: position ?: return
+                launchCommand {
+                    commands.setLocation(at, defaults.accuracyMeters, label)
+                    clearPending(pending)
+                }
+            }
+            MapMode.Route -> startRoute()
+            MapMode.Joystick -> {
+                val from = pending ?: position ?: return
+                launchCommand {
+                    commands.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from)
+                    clearPending(pending)
+                }
+            }
         }
+    }
+
+    /** Forgets the pending spot once it is haunted, unless another one was picked meanwhile. */
+    private fun clearPending(started: LatLng?) {
+        if (started != null && local.pendingSpot == started) local = local.copy(pendingSpot = null, pendingLabel = null)
     }
 
     private fun startRoute() {
@@ -265,10 +309,15 @@ class MapStateHolder(
             // Recorded tracks already follow their path; only hand-placed stops get routed.
             followRoads = local.followRoads && track == null,
             playbackRate = if (timed) local.rate.toDouble() else null,
+            routed = local.currentRoads()?.points,
+            travel = local.travel,
         )
         launchCommand {
             val outcome = commands.playRoute(request)
-            local = local.copy(playingRoute = outcome.points)
+            val stops = request.route.points
+            // Keep the routed line on the map once the route ends, too.
+            val roads = if (request.followRoads && request.routed == null && local.draftRoute == stops) RoadsPreview(stops, request.travel, outcome.points) else local.roads
+            local = local.copy(playingRoute = outcome.points, roads = roads)
             outcome.warning?.let { showNotice(Notice(it, error = false)) }
         }
     }
@@ -293,6 +342,36 @@ class MapStateHolder(
 
     fun setFollowRoads(follow: Boolean) {
         local = local.copy(followRoads = follow)
+    }
+
+    /**
+     * Keeps [LocalUiState.roads] in step with the draft: whenever the stops (or Follow roads) change
+     * in Route mode, fetch the road-following line after a short pause, cancelling any older fetch.
+     */
+    private fun refreshRoads(l: LocalUiState) {
+        if (!commands.canFollowRoads) return
+        val stops = l.draftRoute.takeIf { l.mode == MapMode.Route && l.followsRoads }
+        val target = stops?.let { it to l.travel }
+        if (target == roadsTarget) return
+        roadsTarget = target
+        roadsJob?.cancel()
+        roadsJob = null
+        val travel = l.travel
+        if (stops == null || l.roads?.let { it.stops == stops && it.travel == travel && it.points != null } == true) return
+        localState = l.copy(roads = RoadsPreview(stops, travel))
+        roadsJob = scope.launch {
+            delay(ROADS_DEBOUNCE_MILLIS)
+            val result = try {
+                RoadsPreview(stops, travel, points = commands.routeAlongRoads(stops, travel))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RoadsPreview(stops, travel, error = e.message ?: "Couldn't follow roads")
+            }
+            if (roadsTarget != target) return@launch
+            local = local.copy(roads = result)
+            if (result.error != null) showNotice(Notice(result.error, ROADS_HINT))
+        }
     }
 
     /** Changes the loop mode; a playing route keeps going from where it is. */
@@ -322,13 +401,12 @@ class MapStateHolder(
 
     // --- Joystick ----------------------------------------------------------------------------
 
-    /** Live stick input. Goes straight to the engine: the pad draws its own knob, so [local] isn't touched. */
+    /**
+     * Live stick input. Goes straight to the engine: the pad draws its own knob, so [local] isn't
+     * touched. Ignored until the joystick has been started.
+     */
     fun joystickInput(bearingDeg: Double, magnitude: Double) {
-        val s = controller.state.value
-        if (s !is HauntState.Joystick) {
-            val start = s.currentFix?.position ?: lastPosition ?: return
-            controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = start)
-        }
+        if (controller.state.value !is HauntState.Joystick) return
         controller.joystickInput(bearingDeg, magnitude)
     }
 
@@ -362,11 +440,10 @@ class MapStateHolder(
         /** Range of the Custom speed editor (km/h). */
         val CustomSpeedRangeKmh = 1f..150f
 
-        /** Label of the place set by the locate button. */
-        const val MY_LOCATION_LABEL = "My location"
+        /** Pause after the last stop edit before the road preview is fetched. */
+        const val ROADS_DEBOUNCE_MILLIS = 400L
 
-        /** A first stop closer than this to "my location" counts as already starting there. */
-        private const val SAME_STOP_METERS = 25.0
+        const val ROADS_HINT = "Turn off Follow roads to use straight lines, or check the routing server in Settings"
     }
 }
 

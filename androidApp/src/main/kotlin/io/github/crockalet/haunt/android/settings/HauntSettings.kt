@@ -1,6 +1,8 @@
 package io.github.crockalet.haunt.android.settings
 
+import io.github.crockalet.haunt.android.net.RoutingEndpoint
 import io.github.crockalet.haunt.core.HauntDefaults
+import io.github.crockalet.haunt.core.Travel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +31,10 @@ data class HauntSettings(
     val searchUrl: String = DEFAULT_SEARCH_URL,
     /** OSRM base URL (road-following routes). */
     val routingUrl: String = DEFAULT_ROUTING_URL,
-    /** OSRM profile segment, e.g. "driving", "foot", "bike" (the public demo only serves driving). */
+    /**
+     * OSRM profile segment, e.g. "driving", "foot", "bike" (the public demo only serves driving).
+     * Left at the defaults, walking and cycling speeds route on FOSSGIS's foot / bike servers instead.
+     */
     val routingProfile: String = DEFAULT_ROUTING_PROFILE,
     /** The map: [DEFAULT_MAP_STYLE_URL] = Haunt's own style over OpenFreeMap; anything else is a MapLibre style URL. */
     val mapStyleUrl: String = DEFAULT_MAP_STYLE_URL,
@@ -46,10 +51,21 @@ data class HauntSettings(
 ) {
     val defaults: HauntDefaults get() = HauntDefaults(accuracy = accuracyMeters, altitude = altitudeMeters)
 
+    val routesByTravel: Boolean get() = routingUrl == DEFAULT_ROUTING_URL && routingProfile == DEFAULT_ROUTING_PROFILE
+
+    fun routingEndpoint(travel: Travel): RoutingEndpoint = when {
+        !routesByTravel -> RoutingEndpoint(routingUrl, routingProfile)
+        travel == Travel.Foot -> RoutingEndpoint(FOOT_ROUTING_URL, DEFAULT_ROUTING_PROFILE)
+        travel == Travel.Bike -> RoutingEndpoint(BIKE_ROUTING_URL, DEFAULT_ROUTING_PROFILE)
+        else -> RoutingEndpoint(routingUrl, routingProfile)
+    }
+
     companion object {
         const val DEFAULT_SEARCH_URL = "https://photon.komoot.io"
         const val DEFAULT_ROUTING_URL = "https://router.project-osrm.org"
         const val DEFAULT_ROUTING_PROFILE = "driving"
+        const val FOOT_ROUTING_URL = "https://routing.openstreetmap.de/routed-foot"
+        const val BIKE_ROUTING_URL = "https://routing.openstreetmap.de/routed-bike"
         /** OpenFreeMap's tiles, drawn with Haunt's own style (`HauntMapStyle`). */
         const val DEFAULT_MAP_STYLE_URL = "https://tiles.openfreemap.org/planet"
         /** Default before Haunt had its own style; read as [DEFAULT_MAP_STYLE_URL]. */

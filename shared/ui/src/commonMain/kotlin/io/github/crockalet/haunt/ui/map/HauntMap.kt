@@ -2,6 +2,8 @@ package io.github.crockalet.haunt.ui.map
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.ui.state.MapContent
 import io.github.crockalet.haunt.ui.state.MapStyle
@@ -11,7 +13,9 @@ import io.github.crockalet.haunt.ui.state.MapStyle
  * map colours by default, see [HauntMapStyle]); other targets draw [DrawnMap], an illustrative stand-in.
  *
  * Shows the ghost marker + accuracy halo at [MapContent.fix], the route polyline and joystick
- * trail, and reports long-presses via [onLongPress].
+ * trail, a ring at the [MapContent.pending] spot, and reports long-presses via [onLongPress].
+ * Animates to each new [MapContent.focus].
+ * [bottomInset] (from the bottom edge) is covered by the app's chrome; the attribution sits above it.
  */
 @Composable
 expect fun HauntMap(
@@ -19,4 +23,5 @@ expect fun HauntMap(
     style: MapStyle,
     onLongPress: (LatLng) -> Unit,
     modifier: Modifier = Modifier,
+    bottomInset: Dp = 0.dp,
 )

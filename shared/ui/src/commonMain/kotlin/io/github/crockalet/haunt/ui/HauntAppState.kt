@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.HauntController
 import io.github.crockalet.haunt.ui.screens.LibraryTab
 import io.github.crockalet.haunt.ui.screens.OnboardingUiState
@@ -14,6 +15,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import io.github.crockalet.haunt.ui.state.ControllerCommands
 import io.github.crockalet.haunt.ui.state.HauntCommands
 import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.LicenceDoc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import io.github.crockalet.haunt.ui.state.LocalUiState
@@ -25,9 +27,10 @@ import io.github.crockalet.haunt.ui.theme.ThemeMode
 
 /**
  * Destinations. The map is always underneath; the others are glass sheets over it.
- * [ActivityLog] and [Service] are opened from Settings and go back to it.
+ * [ActivityLog], [Service] and [DataLicences] are opened from Settings and go back to it;
+ * [LicenceText] is opened from [DataLicences].
  */
-enum class Screen { Map, Search, Library, Settings, ActivityLog, Service }
+enum class Screen { Map, Search, Library, Settings, ActivityLog, Service, DataLicences, LicenceText }
 
 /**
  * App-level UI state: navigation, theme override, per-screen UI state and the map presenter.
@@ -57,11 +60,23 @@ class HauntAppState(
     var libraryTab by mutableStateOf(initialLibraryTab)
     var libraryFolder by mutableStateOf<String?>(null)
 
+    /** How far up from the bottom the map keeps its attribution, clear of the toolbar (measured by the map screen). */
+    var mapBottomInset by mutableStateOf(0.dp)
+
     /** The endpoint being edited on [Screen.Service], with the draft URL / profile. */
     var service by mutableStateOf<ServiceEndpoint?>(null)
         private set
     var serviceUrl by mutableStateOf("")
     var serviceProfile by mutableStateOf("")
+
+    /** The licence or notice shown on [Screen.LicenceText]. */
+    var licenceDoc by mutableStateOf<LicenceDoc?>(null)
+        private set
+
+    fun openLicenceDoc(doc: LicenceDoc) {
+        licenceDoc = doc
+        screen = Screen.LicenceText
+    }
 
     fun navigate(to: Screen) {
         if (to == Screen.Search) searchQuery = ""
@@ -107,7 +122,11 @@ class HauntAppState(
             }
             return false
         }
-        screen = if (screen == Screen.ActivityLog || screen == Screen.Service) Screen.Settings else Screen.Map
+        screen = when (screen) {
+            Screen.ActivityLog, Screen.Service, Screen.DataLicences -> Screen.Settings
+            Screen.LicenceText -> Screen.DataLicences
+            else -> Screen.Map
+        }
         return true
     }
 }

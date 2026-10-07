@@ -5,33 +5,42 @@ import io.github.crockalet.haunt.android.data.ActivitySource
 import io.github.crockalet.haunt.android.data.FavoritesStore
 import io.github.crockalet.haunt.android.data.HistoryEntry
 import io.github.crockalet.haunt.android.settings.HauntSettings
+import io.github.crockalet.haunt.android.settings.InMemoryKeyValueStore
+import io.github.crockalet.haunt.android.settings.SettingsStore
 import io.github.crockalet.haunt.android.settings.ThemeMode
 import io.github.crockalet.haunt.android.settings.Units
 import io.github.crockalet.haunt.android.ui.OnboardingFlow
 import io.github.crockalet.haunt.android.ui.OnboardingInputs
 import io.github.crockalet.haunt.android.ui.UiMapping
 import io.github.crockalet.haunt.android.control.AndroidHauntApi
+import io.github.crockalet.haunt.android.net.HttpException
 import io.github.crockalet.haunt.android.ui.AndroidCommands
 import io.github.crockalet.haunt.core.HauntState
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.protocol.Favorite
 import io.github.crockalet.haunt.protocol.Place
 import io.github.crockalet.haunt.ui.screens.OnboardingStep
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.LocalUiState
+import io.github.crockalet.haunt.ui.state.MapMode
+import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.RouteRequest
 import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.theme.FolderColors
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import java.net.UnknownHostException
 import java.nio.file.Files
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -44,6 +53,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class UiMappingTest {
     private val utc: ZoneId = ZoneOffset.UTC
@@ -128,7 +138,7 @@ class UiMappingTest {
         assertEquals(MapStyle.Default, UiMapping.mapStyle(HauntSettings()))
         assertEquals(MapStyle.Custom("https://tiles.example.org/s.json"), UiMapping.mapStyle(HauntSettings(mapStyleUrl = "https://tiles.example.org/s.json")))
         assertEquals("tiles.example.org", UiMapping.services(HauntSettings(mapStyleUrl = "https://tiles.example.org/style.json"))[0].url)
-        assertEquals(listOf("Haunt · OpenFreeMap", "Photon", "OSRM demo · driving"), UiMapping.services(HauntSettings()).map { it.provider })
+        assertEquals(listOf("Haunt · OpenFreeMap", "Photon", "OSRM demo · FOSSGIS for walk/cycle"), UiMapping.services(HauntSettings()).map { it.provider })
     }
 
     @Test
@@ -214,6 +224,70 @@ class AndroidCommandsTest {
     }
 
     @Test
+    fun joystickStartRunsTheSameChecks() = runTest {
+        val (c, h) = commands()
+        env.selected = false
+        val e = assertFailsWith<CommandException> { c.startJoystick(Speed.kmh(12.0), a) }
+        assertTrue(e.hint!!.isNotBlank())
+        assertEquals(HauntState.Idle, h.controller.state.value)
+        assertEquals(0, env.started)
+
+        env.selected = true
+        c.startJoystick(Speed.kmh(12.0), a)
+        assertEquals(a, assertIs<HauntState.Joystick>(h.controller.state.value).fix.position)
+        assertEquals(1, env.started)
+    }
+
+    @Test
+    fun startInJoystickModeReplacesARunningPinAndShowsThePad() = runTest {
+        val (c, h) = commands()
+        val holder = MapStateHolder(h.controller, defaults = HauntDefaults(), commands = c, scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
+        val pin = LatLng(4.21179, 73.53994)
+        holder.onMapLongPress(pin)
+        holder.start()
+        holder.onEngineState(h.controller.state.value)
+        assertIs<HauntState.Holding>(h.controller.state.value)
+
+        holder.selectMode(MapMode.Joystick)
+        assertIs<HauntState.Holding>(h.controller.state.value) // switching mode leaves the pin running
+        assertEquals("Start joystick", holder.shown.startAction)
+        assertEquals(false, holder.shown.joystick?.live)
+
+        holder.start()
+        holder.onEngineState(h.controller.state.value)
+        assertEquals(pin, assertIs<HauntState.Joystick>(h.controller.state.value).fix.position)
+        assertNull(holder.notice)
+        assertEquals(true, holder.shown.joystick?.live)
+        assertNull(holder.shown.startAction)
+        assertEquals(2, env.started)
+        holder.joystickInput(90.0, 1.0)
+        advance(2.seconds)
+        assertTrue(assertIs<HauntState.Joystick>(h.controller.state.value).distanceMeters > 0.0)
+    }
+
+    @Test
+    fun floatingSettingRoundTripsThroughTheStoreAndTheMap() = runTest {
+        val (c, h) = commands()
+        val store = SettingsStore(InMemoryKeyValueStore())
+        val holder = MapStateHolder(
+            h.controller, LocalUiState(mode = MapMode.Joystick, expanded = true),
+            UiMapping.defaults(store.current), c, CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
+        )
+        // What MainActivity does: the switch → onDefaultsChange → store; the store → LaunchedEffect(settings) → holder.
+        fun toggle(on: Boolean) {
+            holder.defaults = holder.defaults.copy(floatingJoystick = on)
+            store.update { UiMapping.applyDefaults(it, holder.defaults) }
+            holder.defaults = UiMapping.defaults(store.current, holder.defaults)
+        }
+        toggle(true)
+        assertTrue(store.current.floatingJoystick)
+        assertEquals(true, holder.shown.joystick?.floating)
+        toggle(false)
+        assertTrue(!store.current.floatingJoystick)
+        assertEquals(false, holder.shown.joystick?.floating)
+    }
+
+    @Test
     fun rpcErrorsBecomeCommandExceptionsWithHints() = runTest {
         val (c, h) = commands()
         env.selected = false
@@ -237,12 +311,39 @@ class AndroidCommandsTest {
     }
 
     @Test
-    fun routingFailureFallsBackWithAWarning() = runTest {
-        val (c, _) = commands()
+    fun routingFailureIsAnErrorNotAStraightLine() = runTest {
+        val (c, h) = commands()
         router.fail = true
-        val out = c.playRoute(request(Route(listOf(a, b)), followRoads = true))
-        assertEquals(listOf(a, b), out.points)
-        assertTrue(out.warning!!.contains("straight lines"))
+        val e = assertFailsWith<CommandException> { c.playRoute(request(Route(listOf(a, b)), followRoads = true)) }
+        assertTrue(e.message!!.startsWith("Couldn't follow roads"))
+        assertTrue(e.hint!!.contains("Follow roads"))
+        assertEquals(HauntState.Idle, h.controller.state.value)
+        assertEquals(0, env.started)
+    }
+
+    @Test
+    fun previewedLineIsPlayedWithoutRoutingAgain() = runTest {
+        val (c, h) = commands()
+        val routed = listOf(a, LatLng(35.001, 139.005), b)
+        val out = c.playRoute(request(Route(listOf(a, b)), followRoads = true).copy(routed = routed))
+        assertEquals(routed, out.points)
+        assertTrue(router.calls.isEmpty())
+        assertIs<HauntState.Moving>(h.controller.state.value)
+    }
+
+    @Test
+    fun routeAlongRoadsForThePreview() = runTest {
+        val (c, h) = commands()
+        assertTrue(c.canFollowRoads)
+        assertEquals(3, c.routeAlongRoads(listOf(a, b), Travel.Foot).size)
+        assertEquals(HauntState.Idle, h.controller.state.value) // previewing doesn't start faking
+        assertEquals(0, env.started)
+        assertEquals(Travel.Foot, router.travels.last())
+
+        router.failWith = UnknownHostException("router.project-osrm.org")
+        assertEquals("Couldn't follow roads: can't reach the routing server", assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b), Travel.Foot) }.message)
+        router.failWith = HttpException(429, "HTTP 429 from router.project-osrm.org")
+        assertTrue(assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b), Travel.Foot) }.message!!.contains("busy"))
     }
 
     @Test

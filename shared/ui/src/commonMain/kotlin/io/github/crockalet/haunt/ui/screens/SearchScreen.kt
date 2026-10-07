@@ -168,7 +168,7 @@ private fun DetectedCard(d: DetectedUi, actions: SearchActions) {
             }
             Text(Format.coords(d.position), style = HauntTheme.type.monoLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PrimaryButton("Haunt here", { actions.onHauntHere(d.position) }, Modifier.weight(1f), icon = HauntIcons.Play, horizontalPadding = 8.dp)
+                PrimaryButton("Pick here", { actions.onHauntHere(d.position) }, Modifier.weight(1f), icon = HauntIcons.Pin, horizontalPadding = 8.dp)
                 TonalButton("Show on map", { actions.onShowOnMap(d.position) })
                 IconButton(HauntIcons.Star, "Save to favourites", { actions.onSave(d.position) }, size = 48.dp, iconSize = 18.dp, background = c.tile)
             }

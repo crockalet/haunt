@@ -3,6 +3,7 @@ package io.github.crockalet.haunt.ui.screens
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.BasicText
@@ -41,11 +43,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.LoopMode
@@ -53,6 +59,7 @@ import io.github.crockalet.haunt.ui.components.Chip
 import io.github.crockalet.haunt.ui.components.DetailsCard
 import io.github.crockalet.haunt.ui.components.Dot
 import io.github.crockalet.haunt.ui.components.GlassIconButton
+import io.github.crockalet.haunt.ui.components.GlassSurface
 import io.github.crockalet.haunt.ui.components.GlassToolbar
 import io.github.crockalet.haunt.ui.components.IconButton
 import io.github.crockalet.haunt.ui.components.JoystickGrip
@@ -61,6 +68,7 @@ import io.github.crockalet.haunt.ui.components.ProgressBar
 import io.github.crockalet.haunt.ui.components.SearchPill
 import io.github.crockalet.haunt.ui.components.SegmentedControl
 import io.github.crockalet.haunt.ui.components.Slider
+import io.github.crockalet.haunt.ui.components.StartButton
 import io.github.crockalet.haunt.ui.components.StatTiles
 import io.github.crockalet.haunt.ui.components.StatusChip
 import io.github.crockalet.haunt.ui.components.StopButton
@@ -88,6 +96,8 @@ data class MapActions(
     val onModeSelect: (MapMode) -> Unit = {},
     val onToggleExpanded: () -> Unit = {},
     val onPlayPause: () -> Unit = {},
+    /** Start faking what the selected mode has ready ([MapUiState.startAction]). */
+    val onStart: () -> Unit = {},
     val onStop: () -> Unit = {},
     val onSearch: () -> Unit = {},
     val onLibrary: () -> Unit = {},
@@ -103,15 +113,19 @@ data class MapActions(
     val onJoystickMaxSpeed: (Float) -> Unit = {},
     val onJoystickSize: (JoystickSize) -> Unit = {},
     val onFloatingJoystick: (Boolean) -> Unit = {},
+    /** Ask for "Display over other apps" (the floating joystick's permission). */
+    val onAllowOverlay: () -> Unit = {},
     /** The pad was dragged to a new offset (dp from its default spot); persist it. */
     val onJoystickMoved: (xDp: Float, yDp: Float) -> Unit = { _, _ -> },
     /** Locate button (real device location); null hides it. */
     val onLocate: (() -> Unit)? = null,
+    /** Height from the bottom of the window that the map's attribution must clear (toolbar and locate button). */
+    val onBottomChrome: (Dp) -> Unit = {},
 )
 
 /**
  * Map chrome: search pill + status chip on top, joystick pad, details card and the toolbar with
- * the Stop button at the bottom. Drawn over the map by `HauntApp`.
+ * the Start / Stop button at the bottom. Drawn over the map by `HauntApp`.
  */
 @Composable
 fun MapScreen(
@@ -132,15 +146,17 @@ fun MapScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Haunt", Modifier.fillMaxWidth().padding(horizontal = 8.dp), style = HauntTheme.type.title)
-            SearchPill(
-                placeholder = state.searchPlaceholder,
-                leadingIcon = if (state.mode == MapMode.Route) HauntIcons.Plus else HauntIcons.Search,
-                onClick = actions.onSearch,
-                onLibrary = actions.onLibrary,
-                onSettings = actions.onSettings,
-                modifier = Modifier.morph(MorphKeys.Search),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(state.active)
+                SearchPill(
+                    placeholder = state.searchPlaceholder,
+                    leadingIcon = if (state.mode == MapMode.Route) HauntIcons.Plus else HauntIcons.Search,
+                    onClick = actions.onSearch,
+                    onLibrary = actions.onLibrary,
+                    onSettings = actions.onSettings,
+                    modifier = Modifier.weight(1f).morph(MorphKeys.Search),
+                )
+            }
             // Glass is a live blur of the map: fade or move it, never scale it (a scaled blur is
             // re-captured and re-blurred at every frame of the animation).
             AnimatedVisibility(
@@ -155,6 +171,7 @@ fun MapScreen(
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 18.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
+                    // Shown in Joystick mode right away, but it only steers once Start has started the joystick.
                     AnimatedVisibility(
                         state.joystick != null,
                         enter = fadeIn(HauntMotion.snappy()),
@@ -173,7 +190,7 @@ fun MapScreen(
                     }
                 }
                 actions.onLocate?.let { onLocate ->
-                    LocateButton(state.locating, onLocate, Modifier.padding(end = 12.dp, bottom = 12.dp))
+                    LocateButton(state.locating, onLocate, Modifier.padding(end = 12.dp, bottom = LocateButtonGap))
                 }
             }
             AnimatedVisibility(
@@ -203,23 +220,57 @@ fun MapScreen(
                     }
                 }
             }
+            val density = LocalDensity.current
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                Modifier.fillMaxWidth().onGloballyPositioned { toolbar ->
+                    // Measured from the window bottom, which is also the map's (it fills the window).
+                    val fromBottom = toolbar.findRootCoordinates().size.height - toolbar.boundsInRoot().top
+                    actions.onBottomChrome(with(density) { fromBottom.toDp() })
+                },
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Toolbar(state, actions)
-                StopButton(
-                    onClick = actions.onStop,
-                    enabled = state.active,
-                    contentDescription = if (state.mode == MapMode.Route) "Stop route" else "Stop haunting",
-                )
+                StartStop(state, actions)
             }
         }
     }
 }
 
-/** Round glass button: centre on / start from the device's real location. Spins while locating. */
+/**
+ * Start when the selected mode has something ready that isn't running, Stop while something runs.
+ * When both apply (e.g. a new pin picked while a route plays) a small glass Stop sits beside Start.
+ */
+@Composable
+private fun StartStop(state: MapUiState, actions: MapActions) {
+    val start = state.startAction
+    val stopLabel = if (state.route?.started == true) "Stop route" else "Stop haunting"
+    if (start != null && state.active) {
+        // Small enough that toolbar + Stop + Start fit a 360 dp wide phone.
+        GlassIconButton(HauntIcons.Stop, stopLabel, actions.onStop, size = 44.dp, iconSize = 16.dp)
+    }
+    if (start != null || !state.active) {
+        StartButton(onClick = actions.onStart, enabled = start != null, contentDescription = start ?: "Start haunting")
+    } else {
+        StopButton(onClick = actions.onStop, contentDescription = stopLabel)
+    }
+}
+
+/** Glass disc beside the search pill: accent while faking, red while the real location shows. */
+@Composable
+private fun StatusDot(active: Boolean) {
+    val c = HauntTheme.colors
+    val color by animateColorAsState(if (active) c.accent else c.danger, HauntMotion.snappy())
+    val description = if (active) "Faking location" else "Not faking location"
+    GlassSurface(
+        Modifier.size(52.dp).semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Dot(color, size = 14.dp)
+    }
+}
+
+/** Round glass button: centres the map on the device's real location. Spins while locating. */
 @Composable
 private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     // Spin the icon only; rotating the glass would re-blur it every frame.
@@ -232,13 +283,16 @@ private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modif
     }
     GlassIconButton(
         icon = if (locating) HauntIcons.Spinner else HauntIcons.Locate,
-        contentDescription = if (locating) "Finding your location" else "Start from my location",
+        contentDescription = if (locating) "Finding your location" else "Show my location",
         onClick = onClick,
         modifier = modifier,
-        size = 52.dp,
+        size = LocateButtonSize,
         iconModifier = spin,
     )
 }
+
+private val LocateButtonSize = 52.dp
+private val LocateButtonGap = 12.dp
 
 private class LastJoystick {
     var value: JoystickDetails? = null
@@ -294,6 +348,7 @@ private fun MovableJoystick(j: JoystickDetails, areaBounds: Bounds, actions: Map
             onInput = actions.onJoystick,
             padSize = padSize,
             modifier = Modifier.padding(top = 12.dp, end = 12.dp),
+            enabled = j.live,
         )
         JoystickGrip(
             onDrag = { d -> live = clamp((live ?: stored) + Offset(d.x / density.density, d.y / density.density)) },
@@ -349,14 +404,16 @@ private fun StatusContent(status: StatusUi) {
 
 @Composable
 private fun Toolbar(state: MapUiState, actions: MapActions) {
-    val route = state.mode == MapMode.Route
+    // Pause / resume only while a route plays; starting one is the Start button's job.
+    val started = state.route?.takeIf { it.started }
+    val route = started != null
     GlassToolbar(spacing = if (route) 2.dp else 4.dp) {
         ToolbarButton(HauntIcons.Pin, "Pin mode", state.mode == MapMode.Pin, { actions.onModeSelect(MapMode.Pin) })
-        ToolbarButton(HauntIcons.Route, "Route mode", route, { actions.onModeSelect(MapMode.Route) })
+        ToolbarButton(HauntIcons.Route, "Route mode", state.mode == MapMode.Route, { actions.onModeSelect(MapMode.Route) })
         ToolbarButton(HauntIcons.Joystick, "Joystick mode", state.mode == MapMode.Joystick, { actions.onModeSelect(MapMode.Joystick) })
         VerticalHairline(Modifier.padding(horizontal = if (route) 3.dp else 2.dp))
-        if (route) {
-            val playing = state.route?.playing == true
+        started?.let { r ->
+            val playing = r.playing
             ToolbarButton(
                 icon = if (playing) HauntIcons.Pause else HauntIcons.Play,
                 contentDescription = if (playing) "Pause" else "Resume",
@@ -429,7 +486,12 @@ private fun RouteCard(route: RouteDetails, actions: MapActions) {
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Follow roads", Modifier.weight(1f), style = HauntTheme.type.bodyStrong)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Follow roads", style = HauntTheme.type.bodyStrong)
+                route.roadsNote?.let {
+                    Text(it, style = HauntTheme.type.small, color = c.muted, maxLines = 2)
+                }
+            }
             Switch(route.followRoads, actions.onFollowRoads, contentDescription = "Follow roads")
         }
         Row(
@@ -482,5 +544,21 @@ private fun JoystickCard(j: JoystickDetails, actions: MapActions) {
             }
             Switch(j.floating, actions.onFloatingJoystick, contentDescription = "Float over other apps")
         }
+        if (j.floatingNeedsPermission) OverlayPermissionRow(actions.onAllowOverlay)
+    }
+}
+
+/** The floating joystick is on but Android won't draw it over other apps yet; [onAllow] asks for that. */
+@Composable
+internal fun OverlayPermissionRow(onAllow: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Needs “Display over other apps”",
+            Modifier.weight(1f),
+            style = HauntTheme.type.small,
+            color = HauntTheme.colors.muted,
+            maxLines = 2,
+        )
+        Chip("Allow", selected = true, onClick = onAllow, modifier = Modifier.semantics { contentDescription = "Allow display over other apps" })
     }
 }

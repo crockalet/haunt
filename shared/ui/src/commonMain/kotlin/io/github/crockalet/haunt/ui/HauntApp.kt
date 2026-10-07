@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazePerformanceMode
@@ -53,10 +55,14 @@ import io.github.crockalet.haunt.ui.map.HauntMap
 import io.github.crockalet.haunt.ui.platform.PlatformBackHandler
 import io.github.crockalet.haunt.ui.screens.ActivityLogScreen
 import io.github.crockalet.haunt.ui.screens.ConnectAgentCommand
+import io.github.crockalet.haunt.ui.screens.DataLicencesActions
+import io.github.crockalet.haunt.ui.screens.DataLicencesScreen
+import io.github.crockalet.haunt.ui.screens.DataLicencesUiState
 import io.github.crockalet.haunt.ui.screens.DetectedUi
 import io.github.crockalet.haunt.ui.screens.LibraryActions
 import io.github.crockalet.haunt.ui.screens.LibraryScreen
 import io.github.crockalet.haunt.ui.screens.LibraryUiState
+import io.github.crockalet.haunt.ui.screens.LicenceTextScreen
 import io.github.crockalet.haunt.ui.screens.MapActions
 import io.github.crockalet.haunt.ui.screens.MapScreen
 import io.github.crockalet.haunt.ui.screens.OnboardingActions
@@ -76,7 +82,6 @@ import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.MapStyle
-import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.Place
 import io.github.crockalet.haunt.ui.state.detectCoordinates
@@ -116,13 +121,14 @@ fun HauntApp(
         val haze = if (liveBlur) rememberHazeState() else null
         val holder = state.map
         val colors = HauntTheme.colors
+        SideEffect { holder.canDrawOverlays = data.canDrawOverlays }
 
         PlatformBackHandler(enabled = state.screen != Screen.Map || holder.expanded) { state.back() }
 
         // Blur at reduced resolution: indistinguishable at these radii, far cheaper while things move.
         CompositionLocalProvider(LocalHazeState provides haze, LocalHazePerformanceMode provides HazePerformanceMode.Performance) {
             Box(modifier.fillMaxSize().background(colors.map)) {
-                MapBackground(holder, mapStyle, Modifier.fillMaxSize().then(if (haze != null) Modifier.hazeSource(haze) else Modifier))
+                MapBackground(state, mapStyle, Modifier.fillMaxSize().then(if (haze != null) Modifier.hazeSource(haze) else Modifier))
 
                 val onboarding = state.onboarding
                 if (onboarding != null) {
@@ -189,17 +195,20 @@ private val Screen.depth: Int
     get() = when (this) {
         Screen.Map -> 0
         Screen.Search, Screen.Library, Screen.Settings -> 1
-        Screen.ActivityLog, Screen.Service -> 2
+        Screen.ActivityLog, Screen.Service, Screen.DataLicences -> 2
+        Screen.LicenceText -> 3
     }
 
 /** The map alone in its own scope: engine ticks recompose it (and [MapLayer]), not the whole app. */
 @Composable
-private fun MapBackground(holder: MapStateHolder, style: MapStyle, modifier: Modifier) {
+private fun MapBackground(state: HauntAppState, style: MapStyle, modifier: Modifier) {
+    val holder = state.map
     HauntMap(
         content = holder.mapContent,
         style = style,
         onLongPress = holder::onMapLongPress,
         modifier = modifier,
+        bottomInset = state.mapBottomInset,
     )
 }
 
@@ -224,16 +233,18 @@ internal fun rememberMapActions(state: HauntAppState, data: HauntAppData): MapAc
             onModeSelect = holder::selectMode,
             onToggleExpanded = holder::toggleExpanded,
             onPlayPause = holder::playPause,
+            onStart = holder::start,
             onStop = holder::stop,
             onSearch = { state.navigate(Screen.Search) },
             onLibrary = { state.navigate(Screen.Library) },
             onSettings = { state.navigate(Screen.Settings) },
             onCopyCoordinates = {
-                holder.shown.map.fix?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
+                val ui = holder.shown
+                (ui.pin?.position ?: ui.map.fix)?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
             },
             onSaveFavourite = {
                 val ui = holder.shown
-                ui.map.fix?.let { currentData.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
+                (ui.pin?.position ?: ui.map.fix)?.let { currentData.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
             },
             onSpeedPreset = holder::setSpeedPreset,
             onFollowRoads = holder::setFollowRoads,
@@ -244,12 +255,14 @@ internal fun rememberMapActions(state: HauntAppState, data: HauntAppData): MapAc
             onJoystickMaxSpeed = holder::setJoystickMaxSpeed,
             onJoystickSize = { size -> state.updateDefaults(currentData) { it.copy(joystickSize = size) } },
             onFloatingJoystick = { on -> state.updateDefaults(currentData) { it.copy(floatingJoystick = on) } },
+            onAllowOverlay = { currentData.onAllowOverlay() },
             onJoystickMoved = { x, y -> state.updateDefaults(currentData) { it.copy(joystickOffsetX = x, joystickOffsetY = y) } },
             onLocate = if (canLocate) {
                 { currentData.locateMe?.let(holder::locate) }
             } else {
                 null
             },
+            onBottomChrome = { state.mapBottomInset = it },
         )
     }
 }
@@ -266,6 +279,9 @@ private fun Sheet(
     val holder = state.map
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
+    // No browser (or a malformed URL) mustn't crash the app over a credits link.
+    val openUrl: (String) -> Unit = { url -> runCatching { uriHandler.openUri(url) } }
     when (screen) {
         Screen.Search -> Search(state, data, parseCoordinates) { clipboard.getText()?.text }
         Screen.Library -> LibraryScreen(
@@ -282,7 +298,7 @@ private fun Sheet(
                 onTab = { state.libraryTab = it },
                 onFolder = { state.libraryFolder = it },
                 onHaunt = {
-                    holder.hauntAt(it.position, it.name)
+                    holder.pick(it.position, it.name)
                     state.back()
                 },
                 onPlayTrack = {
@@ -300,6 +316,7 @@ private fun Sheet(
                 services = data.services,
                 theme = state.theme,
                 defaults = holder.defaults,
+                floatingNeedsPermission = holder.defaults.floatingJoystick && !data.canDrawOverlays,
             ),
             actions = SettingsActions(
                 onBack = { state.back() },
@@ -320,8 +337,21 @@ private fun Sheet(
                 onUnits = { state.updateDefaults(data) { it.copy(metric = !it.metric) } },
                 onJoystickSize = { state.updateDefaults(data) { d -> d.copy(joystickSize = d.joystickSize.next(JoystickSize.entries)) } },
                 onFloatingJoystick = { on -> state.updateDefaults(data) { it.copy(floatingJoystick = on) } },
+                onAllowOverlay = data.onAllowOverlay,
+                onDataLicences = { state.navigate(Screen.DataLicences) },
             ),
         )
+        Screen.DataLicences -> DataLicencesScreen(
+            state = DataLicencesUiState(data.openSource, data.appVersion, data.contactEmail, data.loadNotice),
+            actions = DataLicencesActions(
+                onBack = { state.back() },
+                onOpenUrl = openUrl,
+                onOpenDoc = state::openLicenceDoc,
+            ),
+        )
+        Screen.LicenceText -> state.licenceDoc?.let { doc ->
+            LicenceTextScreen(doc, onBack = { state.back() }, onOpenUrl = openUrl)
+        }
         Screen.ActivityLog -> ActivityLogScreen(
             log = data.activityLog,
             onBack = { state.back() },
@@ -407,7 +437,7 @@ private fun Search(
             onQueryChange = { state.searchQuery = it },
             onBack = { state.back() },
             onHauntHere = {
-                holder.hauntAt(it, labelFor(it))
+                holder.pick(it, labelFor(it))
                 state.back()
             },
             onShowOnMap = {
@@ -416,7 +446,7 @@ private fun Search(
             },
             onSave = { data.onSaveFavourite(Place(labelFor(it) ?: "Saved place", it)) },
             onPlace = {
-                holder.hauntAt(it.position, it.name)
+                holder.pick(it.position, it.name)
                 state.back()
             },
             onPaste = { readClipboard()?.let { state.searchQuery = it } },

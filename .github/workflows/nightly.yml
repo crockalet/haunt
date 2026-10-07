@@ -35,6 +35,8 @@ jobs:
       # Each build gets a higher versionCode so nightlies install over each other
       # (release builds, but signed with the shared debug key in androidApp/debug.keystore).
       - name: Build APKs and CLI
+        env:
+          HAUNT_CONTACT_EMAIL: ${{ secrets.HAUNT_CONTACT_EMAIL }}
         run: >
           ./gradlew --no-configuration-cache
           :androidApp:assembleFossRelease :androidApp:assemblePlayRelease :cli:distZip

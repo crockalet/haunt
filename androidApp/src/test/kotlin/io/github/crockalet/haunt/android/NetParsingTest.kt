@@ -97,7 +97,9 @@ class NetParsingTest {
     @Test
     fun osrmErrors() {
         val e = assertFailsWith<RoutingException> { OsrmParser.parse("""{"code":"NoRoute","message":"Impossible route"}""") }
-        assertEquals("Routing failed: NoRoute (Impossible route)", e.message)
+        assertEquals("no road route between these stops", e.message)
+        val other = assertFailsWith<RoutingException> { OsrmParser.parse("""{"code":"TooBig","message":"Too many"}""") }
+        assertEquals("Routing failed: TooBig (Too many)", other.message)
         assertFailsWith<RoutingException> { OsrmParser.parse("""{"code":"Ok","routes":[]}""") }
         assertFailsWith<RoutingException> { OsrmParser.parse("""{"code":"Ok","routes":[{"geometry":"encodedpolyline"}]}""") }
         assertFailsWith<RoutingException> { OsrmParser.parse("not json") }

@@ -44,6 +44,19 @@ value class Speed(val metersPerSecond: Double) {
     }
 }
 
+/** How a route is travelled, which decides the road network it is routed on. */
+enum class Travel {
+    Foot, Bike, Car;
+
+    companion object {
+        fun forSpeed(speed: Speed): Travel = when {
+            speed.kmh < 11.0 -> Foot
+            speed.kmh < 32.0 -> Bike
+            else -> Car
+        }
+    }
+}
+
 @Serializable
 data class RouteProgress(
     val traveledMeters: Double,

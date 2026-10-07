@@ -108,6 +108,7 @@ fun DrawnMap(
             Endpoint(project(content.route.first()), start = true)
             if (content.route.size >= 2) Endpoint(project(content.route.last()), start = false)
         }
+        content.pending?.let { Endpoint(project(it), start = false) }
         content.fix?.let { fix ->
             val (x, y) = project(fix)
             Box(Modifier.centeredAt(x, y)) {

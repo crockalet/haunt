@@ -113,6 +113,7 @@ class MapUiStateTest {
         assertEquals(MapMode.Pin, ui.mode)
         assertIs<StatusUi.Message>(ui.status)
         assertNull(ui.map.fix)
+        assertNull(ui.startAction)
     }
 
     @Test
@@ -161,13 +162,16 @@ class HolderAndFakeTest {
         val fake = FakeHauntController(clock = { 0L })
         val holder = MapStateHolder(fake)
         holder.onMapLongPress(LatLng(1.0, 2.0))
+        assertIs<HauntState.Idle>(fake.state.value)
+        holder.start()
         assertIs<HauntState.Holding>(fake.state.value)
 
         holder.selectMode(MapMode.Route)
         holder.onMapLongPress(LatLng(1.0, 2.0))
         holder.onMapLongPress(LatLng(1.0, 2.01))
         assertEquals(2, holder.local.draftRoute.size)
-        holder.playPause()
+        assertIs<HauntState.Holding>(fake.state.value)
+        holder.start()
         val moving = assertIs<HauntState.Moving>(fake.state.value)
         assertTrue(moving.progress.totalMeters > 1000)
 
@@ -187,6 +191,8 @@ class HolderAndFakeTest {
         fake.setLocation(LatLng(0.0, 0.0), null, null, null)
         val holder = MapStateHolder(fake)
         holder.selectMode(MapMode.Joystick)
+        assertIs<HauntState.Holding>(fake.state.value)
+        holder.start()
         assertIs<HauntState.Joystick>(fake.state.value)
         holder.joystickInput(90.0, 1.0)
         fake.tick(10.0)
@@ -194,7 +200,9 @@ class HolderAndFakeTest {
         assertTrue(j.fix.position.lng > 0)
         assertEquals(10 * 12 / 3.6, j.distanceMeters, 0.01)
         holder.selectMode(MapMode.Pin)
-        assertIs<HauntState.Holding>(fake.state.value)
+        assertIs<HauntState.Joystick>(fake.state.value)
+        holder.stop()
+        assertIs<HauntState.Idle>(fake.state.value)
     }
 
     @Test

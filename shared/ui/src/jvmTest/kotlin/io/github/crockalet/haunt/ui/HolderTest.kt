@@ -8,8 +8,11 @@ import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.RouteProgress
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntCommands
+import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.MapStateHolder
@@ -17,14 +20,21 @@ import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.RouteOutcome
 import io.github.crockalet.haunt.ui.state.RouteRequest
 import io.github.crockalet.haunt.ui.state.SpeedPreset
+import io.github.crockalet.haunt.ui.state.StatusUi
 import io.github.crockalet.haunt.ui.state.Track
 import io.github.crockalet.haunt.ui.state.Geo
 import io.github.crockalet.haunt.ui.state.MeasuredLine
 import io.github.crockalet.haunt.ui.state.buildMapUiState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -71,6 +81,7 @@ private class RecordingController(initial: HauntState = HauntState.Idle) : Haunt
 private class RecordingCommands(var failWith: Exception? = null) : HauntCommands {
     val locations = mutableListOf<Pair<LatLng, String?>>()
     val routes = mutableListOf<RouteRequest>()
+    val joysticks = mutableListOf<LatLng>()
     var outcome: (RouteRequest) -> RouteOutcome = { RouteOutcome(it.route.points) }
 
     override suspend fun setLocation(position: LatLng, accuracy: Float?, label: String?) {
@@ -83,6 +94,13 @@ private class RecordingCommands(var failWith: Exception? = null) : HauntCommands
         routes += request
         return outcome(request)
     }
+
+    override suspend fun startJoystick(maxSpeed: Speed, from: LatLng) {
+        failWith?.let { throw it }
+        joysticks += from
+    }
+
+    val any: Boolean get() = locations.isNotEmpty() || routes.isNotEmpty() || joysticks.isNotEmpty()
 }
 
 class HolderTest {
@@ -147,24 +165,113 @@ class HolderTest {
     }
 
     @Test
-    fun longPressAndPlacesGoThroughCommands() {
+    fun longPressAndPlacesOnlyPickUntilStart() {
         val c = RecordingController()
         val commands = RecordingCommands()
         val holder = MapStateHolder(c, commands = commands)
         holder.onMapLongPress(a)
-        holder.hauntAt(b, "Somewhere")
-        assertEquals(listOf<Pair<LatLng, String?>>(a to "Dropped pin", b to "Somewhere"), commands.locations)
+        holder.pick(b, "Somewhere")
+        assertTrue(!commands.any && c.calls.isEmpty())
+        val ui = holder.uiState
+        assertEquals(b, ui.map.pending)
+        assertEquals(b, ui.map.camera)
+        assertEquals("Somewhere", assertNotNull(ui.pin).title)
+        assertEquals("Haunt this spot", ui.startAction)
+        assertEquals(false, ui.active)
+
+        holder.start()
+        assertEquals(listOf<Pair<LatLng, String?>>(b to "Somewhere"), commands.locations)
+        assertNull(holder.local.pendingSpot)
         assertTrue(c.calls.isEmpty())
     }
 
     @Test
-    fun failedCommandShowsNoticeWithHint() {
+    fun failedCommandShowsNoticeWithHintAndKeepsThePick() {
         val commands = RecordingCommands(failWith = CommandException("Haunt isn't the mock location app", "Pick it in Developer options"))
         val holder = MapStateHolder(RecordingController(), commands = commands)
         holder.onMapLongPress(a)
+        assertNull(holder.notice)
+        holder.start()
         assertEquals(Notice("Haunt isn't the mock location app", "Pick it in Developer options"), holder.notice)
+        assertEquals(a, holder.local.pendingSpot)
         holder.dismissNotice()
         assertNull(holder.notice)
+    }
+
+    @Test
+    fun switchingModeNeverStartsOrStopsAnything() {
+        val running = listOf(
+            HauntState.Idle,
+            HauntState.Holding(fix, "pin"),
+            moving(),
+            HauntState.Joystick(fix, Speed.kmh(12.0), 0.0, 0.0),
+        )
+        for (engine in running) {
+            val c = RecordingController(engine)
+            val commands = RecordingCommands()
+            val holder = MapStateHolder(c, LocalUiState(lastPosition = a, draftRoute = listOf(a, b)), commands = commands)
+            for (mode in listOf(MapMode.Joystick, MapMode.Route, MapMode.Pin, MapMode.Joystick, MapMode.Pin)) {
+                holder.selectMode(mode)
+                holder.joystickInput(90.0, 1.0)
+            }
+            assertTrue(c.calls.all { it == "joystickInput" }, "$engine: ${c.calls}")
+            assertTrue(!commands.any, "$engine")
+            assertEquals(engine !is HauntState.Idle, holder.uiState.active)
+        }
+    }
+
+    @Test
+    fun anotherModesSpoofKeepsRunningAndShowsUntilStart() {
+        val c = RecordingController(moving())
+        val commands = RecordingCommands()
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)), commands = commands)
+        holder.selectMode(MapMode.Pin)
+        assertEquals(StatusUi.Message("Haunting · r", active = true), holder.uiState.status)
+        assertNull(holder.uiState.startAction) // nothing picked: the button is Stop
+        holder.selectMode(MapMode.Joystick)
+        assertEquals(StatusUi.Message("Haunting · r", active = true), holder.uiState.status)
+        assertEquals("Start joystick", holder.uiState.startAction)
+        assertEquals(false, assertNotNull(holder.uiState.joystick).live)
+
+        holder.start()
+        assertEquals(listOf(a), commands.joysticks)
+        assertTrue(c.calls.isEmpty()) // replaced without stopping first
+    }
+
+    @Test
+    fun startActionPerModeAndState() {
+        val holding = HauntState.Holding(fix, "pin")
+        val joystick = HauntState.Joystick(fix, Speed.kmh(12.0), 0.0, 0.0)
+        fun start(engine: HauntState, local: LocalUiState) = buildMapUiState(engine, local).startAction
+
+        assertNull(start(HauntState.Idle, LocalUiState()))
+        assertEquals("Haunt last location", start(HauntState.Idle, LocalUiState(lastPosition = a)))
+        assertEquals("Haunt this spot", start(holding, LocalUiState(pendingSpot = b)))
+        assertNull(start(holding, LocalUiState()))
+
+        val route = LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b))
+        assertNull(start(HauntState.Idle, route.copy(draftRoute = listOf(a))))
+        assertEquals("Start route", start(HauntState.Idle, route))
+        assertEquals("Start route", start(holding, route))
+        assertNull(start(moving(), route))
+
+        val joy = LocalUiState(mode = MapMode.Joystick)
+        assertNull(start(HauntState.Idle, joy))
+        assertEquals("Start joystick", start(holding, joy))
+        assertNull(start(joystick, joy))
+        assertEquals("Start joystick", start(joystick, joy.copy(pendingSpot = b)))
+    }
+
+    @Test
+    fun playButtonOnlyPausesAndResumes() {
+        val c = RecordingController()
+        val commands = RecordingCommands()
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)), commands = commands)
+        holder.playPause()
+        assertTrue(!commands.any && c.calls.isEmpty())
+        c.state.value = moving()
+        holder.playPause()
+        assertEquals(listOf("pause"), c.calls)
     }
 
     @Test
@@ -174,7 +281,7 @@ class HolderTest {
         val routed = listOf(a, LatLng(0.001, 0.005), b)
         commands.outcome = { RouteOutcome(routed, warning = null) }
         val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b), followRoads = true, loop = LoopMode.Loop), commands = commands)
-        holder.playPause()
+        holder.start()
         val req = commands.routes.single()
         assertTrue(req.followRoads)
         assertEquals(LoopMode.Loop, req.loop)
@@ -188,7 +295,7 @@ class HolderTest {
     fun routingWarningIsANonErrorNotice() {
         val commands = RecordingCommands().apply { outcome = { RouteOutcome(it.route.points, "Routing failed; using straight lines") } }
         val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)), commands = commands)
-        holder.playPause()
+        holder.start()
         assertEquals(Notice("Routing failed; using straight lines", error = false), holder.notice)
     }
 
@@ -199,7 +306,7 @@ class HolderTest {
         val route = Route(listOf(a, b), timestampsMillis = listOf(0L, 60_000L), name = "run")
         holder.loadTrack(Track("Morning run", "GPX", route.points, route))
         assertEquals(MapMode.Route, holder.local.mode)
-        holder.playPause()
+        holder.start()
         val req = commands.routes.single()
         assertEquals(2.0, req.playbackRate)
         assertEquals(false, req.followRoads)
@@ -215,22 +322,73 @@ class HolderTest {
     // --- Locate button ----------------------------------------------------------------------
 
     @Test
-    fun locateInPinModeHauntsMyLocation() {
+    fun locateOnlyMovesTheCameraInEveryMode() {
+        for (mode in MapMode.entries) {
+            val c = RecordingController()
+            val commands = RecordingCommands()
+            val holder = MapStateHolder(c, LocalUiState(mode = mode, draftRoute = listOf(a)), commands = commands)
+            holder.locate { b }
+            assertEquals(emptyList(), commands.locations, "$mode")
+            assertEquals(emptyList(), c.calls, "$mode")
+            assertEquals(mode, holder.local.mode)
+            assertEquals(listOf(a), holder.local.draftRoute)
+            assertNull(holder.local.lastPosition)
+            assertNull(holder.local.cameraOverride)
+            assertEquals(false, holder.local.locating)
+            assertEquals(b, assertNotNull(holder.uiState.map.focus).target)
+        }
+    }
+
+    @Test
+    fun locatingTheSameSpotAgainIsANewFocus() {
+        val holder = MapStateHolder(RecordingController())
+        holder.locate { a }
+        val first = assertNotNull(holder.shown.map.focus)
+        holder.locate { a }
+        val second = assertNotNull(holder.shown.map.focus)
+        assertEquals(a, second.target)
+        assertNotEquals(first, second)
+    }
+
+    @Test
+    fun searchResultInRouteModeAddsAStopAndFocusesIt() {
         val commands = RecordingCommands()
-        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Pin), commands = commands)
-        holder.locate { b }
-        assertEquals(listOf<Pair<LatLng, String?>>(b to MapStateHolder.MY_LOCATION_LABEL), commands.locations)
-        assertEquals(false, holder.local.locating)
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route, draftRoute = listOf(a)), commands = commands)
+        holder.pick(b, "Somewhere")
+        assertEquals(listOf(a, b), holder.local.draftRoute)
+        assertEquals(b, assertNotNull(holder.shown.map.focus).target)
+        assertTrue(commands.locations.isEmpty())
+    }
+
+    @Test
+    fun searchResultInPinModePicksAndFocusesIt() {
+        val commands = RecordingCommands()
+        val holder = MapStateHolder(RecordingController(), commands = commands)
+        holder.pick(b, "Somewhere")
+        assertTrue(!commands.any)
+        assertEquals(b, holder.local.pendingSpot)
+        assertEquals(b, assertNotNull(holder.shown.map.focus).target)
+    }
+
+    @Test
+    fun longPressDoesNotMoveTheCamera() {
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route), commands = RecordingCommands())
+        holder.onMapLongPress(a)
+        assertEquals(listOf(a), holder.local.draftRoute)
+        assertNull(holder.shown.map.focus)
     }
 
     @Test
     fun joystickWithNoPositionWaitsInsteadOfStarting() {
         val c = RecordingController()
-        val holder = MapStateHolder(c, LocalUiState())
+        val commands = RecordingCommands()
+        val holder = MapStateHolder(c, LocalUiState(), commands = commands)
         holder.selectMode(MapMode.Joystick)
         holder.joystickInput(90.0, 1.0)
+        holder.start()
         assertEquals(MapMode.Joystick, holder.local.mode)
         assertEquals(emptyList(), c.calls)
+        assertTrue(!commands.any)
     }
 
     @Test
@@ -246,11 +404,25 @@ class HolderTest {
     }
 
     @Test
-    fun joystickInputStartsFromTheCurrentFix() {
+    fun joystickStartsFromTheCurrentFixOnStartOnly() {
         val c = RecordingController(HauntState.Holding(Fix(b, timeMillis = 0), "pin"))
-        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick))
+        val commands = RecordingCommands()
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick), commands = commands)
         holder.joystickInput(90.0, 1.0)
-        assertEquals(listOf("startJoystick", "joystickInput"), c.calls)
+        assertTrue(c.calls.isEmpty() && !commands.any)
+        holder.start()
+        assertEquals(listOf(b), commands.joysticks)
+    }
+
+    @Test
+    fun shownFollowsDefaultsChangedAfterConstruction() {
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Joystick), HauntDefaults())
+        holder.defaults = HauntDefaults(floatingJoystick = true, joystickSize = JoystickSize.Small, joystickOffsetX = 10f, joystickOffsetY = -20f, accuracyMeters = 20f)
+        val j = assertNotNull(holder.shown.joystick)
+        assertEquals(true to JoystickSize.Small, j.floating to j.size)
+        assertEquals(10f to -20f, j.offsetX to j.offsetY)
+        holder.selectMode(MapMode.Pin)
+        assertEquals("±20 m", holder.shown.pin?.accuracy)
     }
 
     @Test
@@ -302,32 +474,14 @@ class HolderTest {
     }
 
     @Test
-    fun locateInJoystickModeRestartsTheStickThere() {
-        val c = RecordingController()
-        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick))
+    fun locateWhileARoutePlaysStopsFollowingTheGhost() {
+        val c = RecordingController(moving())
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Route, draftRoute = listOf(b)))
         holder.locate { b }
-        assertEquals(listOf("startJoystick"), c.calls)
-        assertEquals(b, holder.local.lastPosition)
-    }
-
-    @Test
-    fun locateInRouteModeBecomesTheFirstStopOnce() {
-        val far = LatLng(1.0, 1.0)
-        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route, draftRoute = listOf(far)))
-        holder.locate { a }
-        assertEquals(listOf(a, far), holder.local.draftRoute)
-        // Tapping again (a few metres away) doesn't add a duplicate start.
-        holder.locate { LatLng(0.0001, 0.0) }
-        assertEquals(listOf(a, far), holder.local.draftRoute)
-        assertEquals(LatLng(0.0001, 0.0), holder.local.cameraOverride)
-    }
-
-    @Test
-    fun locateWhileARoutePlaysOnlyMovesTheCamera() {
-        val holder = MapStateHolder(RecordingController(moving()), LocalUiState(mode = MapMode.Route, draftRoute = listOf(b)))
-        holder.locate { a }
         assertEquals(listOf(b), holder.local.draftRoute)
-        assertEquals(a, holder.local.cameraOverride)
+        assertEquals(emptyList(), c.calls)
+        assertEquals(b, holder.uiState.map.camera)
+        assertEquals(b, assertNotNull(holder.uiState.map.focus).target)
     }
 
     @Test
@@ -337,6 +491,124 @@ class HolderTest {
         assertEquals(Notice("Haunt is faking your location right now", "Stop haunting first."), holder.notice)
         assertEquals(false, holder.local.locating)
         assertTrue(buildMapUiState(HauntState.Idle, holder.local).locating.not())
+    }
+}
+
+/** Routes along "roads" by adding a detour point after every stop; can be made to fail. */
+private class RoadCommands : HauntCommands {
+    val routed = mutableListOf<List<LatLng>>()
+    val travels = mutableListOf<Travel>()
+    val played = mutableListOf<RouteRequest>()
+    var failWith: Exception? = null
+
+    override suspend fun setLocation(position: LatLng, accuracy: Float?, label: String?) = Unit
+
+    override suspend fun playRoute(request: RouteRequest): RouteOutcome {
+        played += request
+        return RouteOutcome(request.routed ?: routeAlongRoads(request.route.points, request.travel))
+    }
+
+    override suspend fun startJoystick(maxSpeed: Speed, from: LatLng) = Unit
+
+    override val canFollowRoads: Boolean get() = true
+
+    override suspend fun routeAlongRoads(stops: List<LatLng>, travel: Travel): List<LatLng> {
+        routed += stops
+        travels += travel
+        failWith?.let { throw it }
+        return stops.flatMapIndexed { i, p -> if (i == stops.lastIndex) listOf(p) else listOf(p, LatLng(p.lat + 0.001, p.lng)) }
+    }
+}
+
+class RoadsPreviewTest {
+    private val a = LatLng(4.2105, 73.5395)
+    private val b = LatLng(4.2190, 73.5450)
+    private val c = LatLng(4.2220, 73.5410)
+
+    private fun TestScope.holder(commands: RoadCommands, local: LocalUiState = LocalUiState(mode = MapMode.Route)) =
+        MapStateHolder(RecordingController(), local, commands = commands, scope = CoroutineScope(StandardTestDispatcher(testScheduler)))
+
+    @Test
+    fun editingStopsDrawsTheRoutedLineAfterAPause() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands)
+        holder.onMapLongPress(a)
+        holder.onMapLongPress(b)
+        assertEquals("Finding roads…", holder.uiState.route?.roadsNote)
+        assertEquals(listOf(a, b), holder.uiState.map.route) // straight until the roads arrive
+        holder.onMapLongPress(c) // within the debounce: only the last edit is routed
+        advanceUntilIdle()
+        assertEquals(listOf(listOf(a, b, c)), commands.routed)
+        assertEquals(5, holder.uiState.map.route.size)
+        assertNull(holder.uiState.route?.roadsNote)
+        assertTrue(Geo.length(holder.uiState.map.route) > Geo.length(listOf(a, b, c)))
+    }
+
+    @Test
+    fun turningFollowRoadsOffShowsStraightLinesAndOnRoutesAgainOnlyIfNeeded() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        assertEquals(3, holder.uiState.map.route.size)
+        holder.setFollowRoads(false)
+        assertEquals(listOf(a, b), holder.uiState.map.route)
+        holder.setFollowRoads(true)
+        advanceUntilIdle()
+        assertEquals(3, holder.uiState.map.route.size)
+        assertEquals(1, commands.routed.size) // the cached line was still good
+    }
+
+    @Test
+    fun playUsesThePreviewedLineAndDoesNotStartWhilePreviewing() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        assertTrue(commands.played.isEmpty())
+        holder.start()
+        advanceUntilIdle()
+        val req = commands.played.single()
+        assertEquals(3, req.routed?.size)
+        assertEquals(1, commands.routed.size)
+    }
+
+    @Test
+    fun speedPresetPicksTheRoadNetworkAndRefetches() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        holder.setSpeedPreset(SpeedPreset.Cycle)
+        advanceUntilIdle()
+        holder.setSpeedPreset(SpeedPreset.Drive)
+        advanceUntilIdle()
+        assertEquals(listOf(Travel.Foot, Travel.Bike, Travel.Car), commands.travels)
+        holder.start()
+        advanceUntilIdle()
+        assertEquals(Travel.Car, commands.played.single().travel)
+        assertEquals(3, commands.travels.size) // played the previewed line
+    }
+
+    @Test
+    fun routingFailureIsShownNotHidden() = runTest {
+        val commands = RoadCommands().apply { failWith = CommandException("Couldn't follow roads: can't reach the routing server", "hint") }
+        val holder = holder(commands)
+        holder.onMapLongPress(a)
+        holder.onMapLongPress(b)
+        advanceUntilIdle()
+        val route = assertNotNull(holder.uiState.route)
+        assertEquals("Couldn't follow roads: can't reach the routing server", route.roadsNote)
+        assertEquals(Notice("Couldn't follow roads: can't reach the routing server", MapStateHolder.ROADS_HINT), holder.notice)
+        assertEquals(listOf(a, b), holder.uiState.map.route)
+    }
+
+    @Test
+    fun recordedTracksAndOtherModesAreNotRouted() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Pin, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        holder.loadTrack(Track("run", "GPX", listOf(a, b), Route(listOf(a, b), timestampsMillis = listOf(0L, 60_000L))))
+        advanceUntilIdle()
+        assertTrue(commands.routed.isEmpty())
+        assertNull(holder.uiState.route?.roadsNote)
     }
 }
 

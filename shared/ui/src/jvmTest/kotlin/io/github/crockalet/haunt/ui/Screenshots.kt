@@ -16,6 +16,8 @@ import io.github.crockalet.haunt.ui.screens.OnboardingUiState
 import io.github.crockalet.haunt.ui.state.FakeHauntController
 import io.github.crockalet.haunt.ui.state.Geo
 import io.github.crockalet.haunt.ui.state.HauntAppData
+import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.LicenceDoc
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.Notice
@@ -139,6 +141,19 @@ class Screenshots {
         shot("06-map-joystick-expanded") { App(it, joystick, joyLocal.copy(expanded = true)) }
     }
 
+    /** Joystick mode while a pin still runs: the pad waits (dimmed) for Start; floating is on but not allowed yet. */
+    @Test
+    fun mapJoystickReady() {
+        shot("17-map-joystick-ready") { mode ->
+            val controller = FakeHauntController(holding, clock = { t0 })
+            val state = HauntAppState(
+                controller, Screen.Map, mode, pinLocal.copy(mode = MapMode.Joystick, expanded = true),
+                defaults = HauntDefaults(floatingJoystick = true),
+            )
+            HauntApp(controller = controller, data = HauntAppData.Sample.copy(canDrawOverlays = false), state = state)
+        }
+    }
+
     @Test
     fun search() {
         shot("07-search") {
@@ -153,7 +168,25 @@ class Screenshots {
 
     @Test
     fun settings() {
-        shot("09-settings", height = 1290) { App(it, holding, pinLocal, Screen.Settings) }
+        shot("09-settings", height = 1400) { App(it, holding, pinLocal, Screen.Settings) }
+    }
+
+    @Test
+    fun dataLicences() {
+        shot("15-data-licences", height = 1790) { App(it, holding, pinLocal, Screen.DataLicences) }
+        shot("16-licence-text") {
+            App(it, holding, pinLocal, Screen.DataLicences) { s ->
+                val apache = SampleData.openSource.groups.first()
+                s.openLicenceDoc(
+                    LicenceDoc(
+                        apache.licence.name,
+                        "Used by ${apache.libraries.size} libraries",
+                        apache.libraries.map { l -> "${l.name} ${l.version}" },
+                        apache.licence.url,
+                    ) { apache.licence.text.orEmpty() },
+                )
+            }
+        }
     }
 
     @Test

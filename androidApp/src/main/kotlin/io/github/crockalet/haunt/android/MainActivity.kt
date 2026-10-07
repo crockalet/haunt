@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.edit
@@ -27,6 +28,7 @@ import io.github.crockalet.haunt.android.location.RealLocationException
 import io.github.crockalet.haunt.android.ui.AndroidCommands
 import io.github.crockalet.haunt.android.ui.OnboardingFlow
 import io.github.crockalet.haunt.android.ui.OnboardingInputs
+import io.github.crockalet.haunt.android.ui.OpenSourceLicences
 import io.github.crockalet.haunt.android.ui.UiMapping
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.protocol.HauntEvent
@@ -42,6 +44,7 @@ import io.github.crockalet.haunt.ui.screens.OnboardingUiState
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.Notice
+import io.github.crockalet.haunt.ui.state.OpenSourceInfo
 import io.github.crockalet.haunt.ui.state.PlaceSearch
 import io.github.crockalet.haunt.ui.state.detectCoordinates
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +68,9 @@ class MainActivity : ComponentActivity() {
 
     /** Latest onboarding snapshot; null until the first check finishes. */
     private val onboarding = MutableStateFlow<OnboardingInputs?>(null)
+
+    /** "Display over other apps" granted; re-read on resume (it is granted on a system screen). */
+    private val overlayAllowed = MutableStateFlow(true)
 
     /** One-off UI events from outside composition (imports, saves). */
     private val uiEvents = Channel<UiEvent>(Channel.BUFFERED)
@@ -92,6 +98,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         runtime = HauntRuntime.from(this)
+        overlayAllowed.value = Settings.canDrawOverlays(this)
         setContent { App() }
     }
 
@@ -112,6 +119,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        overlayAllowed.value = Settings.canDrawOverlays(this)
         refreshOnboarding()
     }
 
@@ -124,6 +132,7 @@ class MainActivity : ComponentActivity() {
         val log by runtime.activityLog.entries.collectAsState()
         val connections by runtime.controlServer.connections.collectAsState()
         val inputs by onboarding.collectAsState()
+        val canDrawOverlays by overlayAllowed.collectAsState()
 
         val commands = remember {
             AndroidCommands(runtime.api, runtime.controller, runtime.router, runtime::checkCanMock, runtime::startMockingService)
@@ -183,6 +192,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val openSource by produceState(OpenSourceInfo()) {
+            value = withContext(Dispatchers.IO) {
+                runCatching { OpenSourceLicences.load(this@MainActivity) }
+                    .onFailure { Log.w(TAG, "Couldn't read the licence list", it) }
+                    .getOrDefault(OpenSourceInfo())
+            }
+        }
+        val appVersion = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() }
+
         val zone = remember { ZoneId.systemDefault() }
         val historyPlaces = remember(history) { UiMapping.history(history, System.currentTimeMillis(), zone) }
         val data = HauntAppData(
@@ -205,8 +223,14 @@ class MainActivity : ComponentActivity() {
             onDefaultsChange = { d ->
                 val before = runtime.settings.value
                 runtime.updateSettings { UiMapping.applyDefaults(it, d) }
-                if (d.floatingJoystick && !before.floatingJoystick && !Settings.canDrawOverlays(this)) requestOverlayPermission()
+                // The setting never depends on the permission; ask for it once, after that the Allow button does.
+                if (d.floatingJoystick && !before.floatingJoystick && !Settings.canDrawOverlays(this) && !prefs.getBoolean(KEY_OVERLAY_ASKED, false)) {
+                    prefs.edit { putBoolean(KEY_OVERLAY_ASKED, true) }
+                    requestOverlayPermission()
+                }
             },
+            canDrawOverlays = canDrawOverlays,
+            onAllowOverlay = ::requestOverlayPermission,
             onServiceSave = { kind, url, profile -> runtime.updateSettings { UiMapping.applyService(it, kind, url, profile) } },
             onClearLog = runtime.activityLog::clear,
             locateMe = {
@@ -216,6 +240,10 @@ class MainActivity : ComponentActivity() {
                     throw CommandException(e.message ?: "Couldn't find your location", e.hint, e)
                 }
             },
+            openSource = openSource,
+            loadNotice = { path -> withContext(Dispatchers.IO) { OpenSourceLicences.readNotice(this@MainActivity, path) } },
+            appVersion = appVersion,
+            contactEmail = getString(R.string.contact_email).ifBlank { null },
         )
 
         HauntApp(
@@ -382,6 +410,7 @@ class MainActivity : ComponentActivity() {
         const val UI_PREFS = "haunt_ui"
         const val KEY_ONBOARDING_DONE = "onboarding_done"
         const val KEY_NOTIFICATIONS_ASKED = "notifications_asked"
+        const val KEY_OVERLAY_ASKED = "overlay_asked"
         const val RECHECK_MILLIS = 2_000L
         const val SEARCH_LIMIT = 8
         const val NEARBY_LIMIT = 5
