@@ -1,5 +1,6 @@
 package io.github.crockalet.haunt.android
 
+import io.github.crockalet.haunt.android.net.RoutingEndpoint
 import io.github.crockalet.haunt.android.settings.HauntSettings
 import io.github.crockalet.haunt.android.settings.InMemoryKeyValueStore
 import io.github.crockalet.haunt.android.settings.SettingsKeys
@@ -7,6 +8,8 @@ import io.github.crockalet.haunt.android.settings.SettingsStore
 import io.github.crockalet.haunt.android.settings.ThemeMode
 import io.github.crockalet.haunt.android.settings.Units
 import io.github.crockalet.haunt.core.HauntDefaults
+import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -14,6 +17,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SettingsTest {
+    @Test
+    fun defaultRoutingPicksServerByTravel() {
+        val d = HauntSettings()
+        assertEquals(RoutingEndpoint(HauntSettings.FOOT_ROUTING_URL, "driving"), d.routingEndpoint(Travel.forSpeed(Speed.Walk)))
+        assertEquals(RoutingEndpoint(HauntSettings.BIKE_ROUTING_URL, "driving"), d.routingEndpoint(Travel.forSpeed(Speed.Cycle)))
+        assertEquals(RoutingEndpoint(HauntSettings.DEFAULT_ROUTING_URL, "driving"), d.routingEndpoint(Travel.forSpeed(Speed.Drive)))
+        val custom = d.copy(routingUrl = "https://osrm.example")
+        assertEquals(RoutingEndpoint("https://osrm.example", "driving"), custom.routingEndpoint(Travel.Foot))
+        val foot = d.copy(routingProfile = "foot")
+        assertEquals(RoutingEndpoint(HauntSettings.DEFAULT_ROUTING_URL, "foot"), foot.routingEndpoint(Travel.Bike))
+    }
+
     @Test
     fun emptyStoreGivesDefaults() {
         assertEquals(HauntSettings(), SettingsKeys.read(InMemoryKeyValueStore()))

@@ -263,7 +263,7 @@ Pluggable endpoints (Settings → Map & services):
 |---|---|---|
 | Map style | Haunt's own light / dark style (`HauntMapStyle`, generated from the theme's map colours) over OpenFreeMap tiles (no key) | any MapLibre style URL (used for both themes); satellite = user-provided URL |
 | Search | Photon (komoot) | Photon URL, Nominatim URL (1 req/s, no autocomplete) |
-| Routing | OSRM public demo (fair use, attribution) | OSRM / Valhalla / GraphHopper URL + optional API key |
+| Routing | OSRM public demo for driving, FOSSGIS `routed-foot` / `routed-bike` for walk / cycle speeds (fair use, ≤ 1 req/s, attribution) | OSRM / Valhalla / GraphHopper URL + optional API key |
 
 All requests send a proper `User-Agent` and attributions are shown on the map. If routing fails,
 the app falls back to straight lines and tells the user.

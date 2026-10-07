@@ -165,7 +165,7 @@ class HauntRuntime internal constructor(context: Context) {
     /** The device's real position (locate button); see [RealLocation] for how it copes with faking. */
     val realLocation = RealLocation(app, isFaking = { state.value !is HauntState.Idle })
 
-    val router: Router = OsrmRouter(http, { settings.value.routingUrl }, { settings.value.routingProfile })
+    val router: Router = OsrmRouter(http, { settings.value.routingEndpoint(it) })
 
     // --- API & ADB control ------------------------------------------------------------------------
 

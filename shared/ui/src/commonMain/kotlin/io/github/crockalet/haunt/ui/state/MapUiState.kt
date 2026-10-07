@@ -6,6 +6,7 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.core.currentFix
 import kotlin.math.roundToLong
 
@@ -69,7 +70,6 @@ data class RouteDetails(
     val started: Boolean,
     /** Under the Follow roads switch: "Finding roads…" or why routing failed; null when there's nothing to say. */
     val roadsNote: String? = null,
-    val roadsFailed: Boolean = false,
 )
 
 @Immutable
@@ -159,10 +159,14 @@ data class LocalUiState(
 
 fun LocalUiState.presetSpeed(): Speed = speedPreset.speed ?: customSpeed
 
+/** Picked by the preset, not the playback rate: walking at 4× still routes on footpaths. */
+val LocalUiState.travel: Travel get() = Travel.forSpeed(presetSpeed())
+
 /** Road-following line through [stops]: loading while both [points] and [error] are null. */
 @Immutable
 data class RoadsPreview(
     val stops: List<LatLng>,
+    val travel: Travel,
     val points: List<LatLng>? = null,
     val error: String? = null,
 )
@@ -172,7 +176,7 @@ val LocalUiState.followsRoads: Boolean
     get() = followRoads && draftTrack == null && draftRoute.size >= 2
 
 /** [LocalUiState.roads] if it's for the current stops and Follow roads is on. */
-fun LocalUiState.currentRoads(): RoadsPreview? = roads?.takeIf { followsRoads && it.stops == draftRoute }
+fun LocalUiState.currentRoads(): RoadsPreview? = roads?.takeIf { followsRoads && it.stops == draftRoute && it.travel == travel }
 
 /** Pure mapping from engine state + local UI state to [MapUiState]. */
 fun buildMapUiState(
@@ -261,7 +265,6 @@ internal fun buildMapUiState(
             playing = moving != null && !moving.paused,
             started = moving != null,
             roadsNote = roads?.let { it.error ?: if (it.points == null) "Finding roads…" else null },
-            roadsFailed = roads?.error != null,
         )
     } else null
 

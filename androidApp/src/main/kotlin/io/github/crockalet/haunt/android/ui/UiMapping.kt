@@ -156,7 +156,11 @@ object UiMapping {
         ),
         ServiceEndpoint(
             "Routing",
-            (if (s.routingUrl == HauntSettings.DEFAULT_ROUTING_URL) "OSRM demo" else "OSRM (custom)") + " · ${s.routingProfile}",
+            when {
+                s.routesByTravel -> "OSRM demo · FOSSGIS for walk/cycle"
+                s.routingUrl == HauntSettings.DEFAULT_ROUTING_URL -> "OSRM demo · ${s.routingProfile}"
+                else -> "OSRM (custom) · ${s.routingProfile}"
+            },
             host(s.routingUrl),
             ServiceKind.Routing,
             s.routingUrl,

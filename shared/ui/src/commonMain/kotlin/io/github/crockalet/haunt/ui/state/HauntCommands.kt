@@ -5,6 +5,7 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 
 /** What the map screen asks for when it starts playing a route. */
 data class RouteRequest(
@@ -18,6 +19,8 @@ data class RouteRequest(
     val playbackRate: Double?,
     /** Road-following line already fetched for these stops (the map's preview); routed again when null. */
     val routed: List<LatLng>? = null,
+    /** Road network to route on when [routed] is null. */
+    val travel: Travel = Travel.forSpeed(speed),
 )
 
 /** What was actually played: the (possibly road-following) polyline and an optional warning. */
@@ -45,10 +48,10 @@ interface HauntCommands {
     val canFollowRoads: Boolean get() = false
 
     /**
-     * The road-following line through [stops], for the map's preview while stops are edited.
-     * Throws (with a message worth showing) when no route could be computed.
+     * The road-following line through [stops] for [travel], for the map's preview while stops are
+     * edited. Throws (with a message worth showing) when no route could be computed.
      */
-    suspend fun routeAlongRoads(stops: List<LatLng>): List<LatLng> = stops
+    suspend fun routeAlongRoads(stops: List<LatLng>, travel: Travel): List<LatLng> = stops
 }
 
 /** Calls the controller directly (previews, tests, desktop). Straight lines only. */

@@ -154,7 +154,7 @@ Exit codes: `0` ok, `1` error (bad arguments, routing/search/state errors), `2` 
 | `Location permission not granted …` | Prerequisite 4 (`pm grant … ACCESS_FINE_LOCATION`). |
 | `Haunt isn't mocking a location yet; set one first` | `haunt set …` before `haunt go`. |
 | `No place found for "…"` / `Place search failed: …` | Use coordinates, or check the phone's internet / Settings → search service. |
-| `warning: Routing failed (…); using straight lines` | Not fatal: the route runs as straight lines. The default OSRM demo server only has a driving profile, so walking routes follow car roads. |
+| `warning: Routing failed (…); using straight lines` | Not fatal: the route runs as straight lines. With default settings, walking and cycling speeds route on footpaths / cycle routes and faster speeds on car roads. |
 | `Update the haunt CLI and the Haunt app to matching versions` | Protocol mismatch; install matching nightly CLI and APK. |
 
 ## When to use `haunt mcp` instead

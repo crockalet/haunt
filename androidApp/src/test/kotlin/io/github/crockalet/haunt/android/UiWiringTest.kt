@@ -18,6 +18,7 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.protocol.Favorite
 import io.github.crockalet.haunt.protocol.Place
 import io.github.crockalet.haunt.ui.screens.OnboardingStep
@@ -130,7 +131,7 @@ class UiMappingTest {
         assertEquals(MapStyle.Default, UiMapping.mapStyle(HauntSettings()))
         assertEquals(MapStyle.Custom("https://tiles.example.org/s.json"), UiMapping.mapStyle(HauntSettings(mapStyleUrl = "https://tiles.example.org/s.json")))
         assertEquals("tiles.example.org", UiMapping.services(HauntSettings(mapStyleUrl = "https://tiles.example.org/style.json"))[0].url)
-        assertEquals(listOf("Haunt · OpenFreeMap", "Photon", "OSRM demo · driving"), UiMapping.services(HauntSettings()).map { it.provider })
+        assertEquals(listOf("Haunt · OpenFreeMap", "Photon", "OSRM demo · FOSSGIS for walk/cycle"), UiMapping.services(HauntSettings()).map { it.provider })
     }
 
     @Test
@@ -278,14 +279,15 @@ class AndroidCommandsTest {
     fun routeAlongRoadsForThePreview() = runTest {
         val (c, h) = commands()
         assertTrue(c.canFollowRoads)
-        assertEquals(3, c.routeAlongRoads(listOf(a, b)).size)
+        assertEquals(3, c.routeAlongRoads(listOf(a, b), Travel.Foot).size)
         assertEquals(HauntState.Idle, h.controller.state.value) // previewing doesn't start faking
         assertEquals(0, env.started)
+        assertEquals(Travel.Foot, router.travels.last())
 
         router.failWith = UnknownHostException("router.project-osrm.org")
-        assertEquals("Couldn't follow roads: can't reach the routing server", assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b)) }.message)
+        assertEquals("Couldn't follow roads: can't reach the routing server", assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b), Travel.Foot) }.message)
         router.failWith = HttpException(429, "HTTP 429 from router.project-osrm.org")
-        assertTrue(assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b)) }.message!!.contains("busy"))
+        assertTrue(assertFailsWith<CommandException> { c.routeAlongRoads(listOf(a, b), Travel.Foot) }.message!!.contains("busy"))
     }
 
     @Test

@@ -8,6 +8,7 @@ import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.RouteProgress
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntCommands
 import io.github.crockalet.haunt.ui.state.LocalUiState
@@ -483,6 +484,7 @@ class HolderTest {
 /** Routes along "roads" by adding a detour point after every stop; can be made to fail. */
 private class RoadCommands : HauntCommands {
     val routed = mutableListOf<List<LatLng>>()
+    val travels = mutableListOf<Travel>()
     val played = mutableListOf<RouteRequest>()
     var failWith: Exception? = null
 
@@ -490,15 +492,16 @@ private class RoadCommands : HauntCommands {
 
     override suspend fun playRoute(request: RouteRequest): RouteOutcome {
         played += request
-        return RouteOutcome(request.routed ?: routeAlongRoads(request.route.points))
+        return RouteOutcome(request.routed ?: routeAlongRoads(request.route.points, request.travel))
     }
 
     override suspend fun startJoystick(maxSpeed: Speed, from: LatLng) = Unit
 
     override val canFollowRoads: Boolean get() = true
 
-    override suspend fun routeAlongRoads(stops: List<LatLng>): List<LatLng> {
+    override suspend fun routeAlongRoads(stops: List<LatLng>, travel: Travel): List<LatLng> {
         routed += stops
+        travels += travel
         failWith?.let { throw it }
         return stops.flatMapIndexed { i, p -> if (i == stops.lastIndex) listOf(p) else listOf(p, LatLng(p.lat + 0.001, p.lng)) }
     }
@@ -556,6 +559,22 @@ class RoadsPreviewTest {
     }
 
     @Test
+    fun speedPresetPicksTheRoadNetworkAndRefetches() = runTest {
+        val commands = RoadCommands()
+        val holder = holder(commands, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
+        advanceUntilIdle()
+        holder.setSpeedPreset(SpeedPreset.Cycle)
+        advanceUntilIdle()
+        holder.setSpeedPreset(SpeedPreset.Drive)
+        advanceUntilIdle()
+        assertEquals(listOf(Travel.Foot, Travel.Bike, Travel.Car), commands.travels)
+        holder.start()
+        advanceUntilIdle()
+        assertEquals(Travel.Car, commands.played.single().travel)
+        assertEquals(3, commands.travels.size) // played the previewed line
+    }
+
+    @Test
     fun routingFailureIsShownNotHidden() = runTest {
         val commands = RoadCommands().apply { failWith = CommandException("Couldn't follow roads: can't reach the routing server", "hint") }
         val holder = holder(commands)
@@ -564,7 +583,6 @@ class RoadsPreviewTest {
         advanceUntilIdle()
         val route = assertNotNull(holder.uiState.route)
         assertEquals("Couldn't follow roads: can't reach the routing server", route.roadsNote)
-        assertTrue(route.roadsFailed)
         assertEquals(Notice("Couldn't follow roads: can't reach the routing server", MapStateHolder.ROADS_HINT), holder.notice)
         assertEquals(listOf(a, b), holder.uiState.map.route)
     }

@@ -6,6 +6,7 @@ import io.github.crockalet.haunt.android.net.Router
 import io.github.crockalet.haunt.android.net.RoutingException
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.protocol.HauntApi
 import io.github.crockalet.haunt.protocol.RoutePlayParams
 import io.github.crockalet.haunt.protocol.RpcException
@@ -67,7 +68,7 @@ class AndroidCommands(
 
         checkCanMock() // fail fast, before any network call
         // Asked for roads but got none: say so rather than quietly playing straight lines.
-        val points = if (request.followRoads) request.routed?.takeIf { it.size >= 2 } ?: routeAlongRoads(route.points) else route.points
+        val points = if (request.followRoads) request.routed?.takeIf { it.size >= 2 } ?: routeAlongRoads(route.points, request.travel) else route.points
         val result = api.playRoute(
             RoutePlayParams(
                 waypoints = points,
@@ -81,9 +82,9 @@ class AndroidCommands(
 
     override val canFollowRoads: Boolean get() = true
 
-    override suspend fun routeAlongRoads(stops: List<LatLng>): List<LatLng> = withContext(dispatcher) {
+    override suspend fun routeAlongRoads(stops: List<LatLng>, travel: Travel): List<LatLng> = withContext(dispatcher) {
         try {
-            router.route(stops).points.takeIf { it.size >= 2 } ?: throw RoutingException("Routing returned an empty line")
+            router.route(stops, travel).points.takeIf { it.size >= 2 } ?: throw RoutingException("Routing returned an empty line")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

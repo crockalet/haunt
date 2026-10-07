@@ -10,6 +10,7 @@ import io.github.crockalet.haunt.core.DefaultHauntController
 import io.github.crockalet.haunt.core.Geo
 import io.github.crockalet.haunt.core.HauntClock
 import io.github.crockalet.haunt.core.LatLng
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.protocol.HauntEvent
 import io.github.crockalet.haunt.protocol.Place
 import io.github.crockalet.haunt.protocol.RpcException
@@ -48,8 +49,10 @@ class FakeGeocoder(var places: Map<String, Place> = emptyMap(), var fail: Boolea
 
 class FakeRouter(var fail: Boolean = false, var failWith: Exception? = null) : Router {
     val calls = mutableListOf<List<LatLng>>()
-    override suspend fun route(waypoints: List<LatLng>): RoutedPath {
+    val travels = mutableListOf<Travel>()
+    override suspend fun route(waypoints: List<LatLng>, travel: Travel): RoutedPath {
         calls += waypoints
+        travels += travel
         failWith?.let { throw it }
         if (fail) throw RoutingException("Routing failed: NoRoute")
         // A detour via a midpoint shifted east.

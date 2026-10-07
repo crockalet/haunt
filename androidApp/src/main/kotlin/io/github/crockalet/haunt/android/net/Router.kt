@@ -2,6 +2,10 @@ package io.github.crockalet.haunt.android.net
 
 import io.github.crockalet.haunt.core.Geo
 import io.github.crockalet.haunt.core.LatLng
+import io.github.crockalet.haunt.core.Travel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -23,21 +27,39 @@ class RoutingException(message: String, cause: Throwable? = null) : IOException(
 /** Road routing. */
 interface Router {
     /** @throws IOException (incl. [RoutingException]) when no route could be computed. */
-    suspend fun route(waypoints: List<LatLng>): RoutedPath
+    suspend fun route(waypoints: List<LatLng>, travel: Travel = Travel.Car): RoutedPath
 }
+
+/** An OSRM server and the profile segment to ask it for. */
+data class RoutingEndpoint(val baseUrl: String, val profile: String)
 
 /**
  * [OSRM](https://project-osrm.org/) router:
  * `GET {base}/route/v1/{profile}/{lng,lat;lng,lat;…}?overview=full&geometries=geojson`.
+ * Requests are spaced at least [minIntervalMillis] apart.
  */
 class OsrmRouter(
     private val http: HttpClient,
-    private val baseUrl: () -> String,
-    private val profile: () -> String = { "driving" },
+    private val endpoint: (Travel) -> RoutingEndpoint,
+    private val minIntervalMillis: Long = 1000L,
 ) : Router {
-    override suspend fun route(waypoints: List<LatLng>): RoutedPath {
+    private val lock = Mutex()
+    private var lastRequestNanos: Long? = null
+
+    override suspend fun route(waypoints: List<LatLng>, travel: Travel): RoutedPath {
         require(waypoints.size >= 2) { "need at least 2 waypoints" }
-        return OsrmParser.parse(http.get(buildUrl(baseUrl(), profile(), waypoints)))
+        val (base, profile) = endpoint(travel)
+        val url = buildUrl(base, profile, waypoints)
+        // The public OSRM servers allow one request per second per client.
+        val body = lock.withLock {
+            lastRequestNanos?.let { delay(minIntervalMillis - (System.nanoTime() - it) / 1_000_000) }
+            try {
+                http.get(url)
+            } finally {
+                lastRequestNanos = System.nanoTime()
+            }
+        }
+        return OsrmParser.parse(body)
     }
 
     companion object {

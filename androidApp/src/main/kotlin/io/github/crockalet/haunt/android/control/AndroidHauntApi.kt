@@ -12,6 +12,7 @@ import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
 import io.github.crockalet.haunt.core.TrackFormats
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.core.currentFix
 import io.github.crockalet.haunt.protocol.Favorite
 import io.github.crockalet.haunt.protocol.FavoriteDeleteParams
@@ -105,7 +106,7 @@ class AndroidHauntApi(
             params.waypoints != null -> {
                 val waypoints = params.waypoints!!
                 if (params.followRoads) {
-                    val routed = routeOrNull(waypoints, warnings)
+                    val routed = routeOrNull(waypoints, warnings, travelFor(params.metersPerSecond))
                     followed = routed != null
                     Route(routed ?: waypoints, name = params.name)
                 } else {
@@ -151,7 +152,7 @@ class AndroidHauntApi(
         val warnings = mutableListOf<String>()
         var followed = false
         val points = if (params.followRoads) {
-            routeOrNull(listOf(from, target), warnings)?.also { followed = true } ?: listOf(from, target)
+            routeOrNull(listOf(from, target), warnings, travelFor(params.metersPerSecond))?.also { followed = true } ?: listOf(from, target)
         } else {
             listOf(from, target)
         }
@@ -261,8 +262,10 @@ class AndroidHauntApi(
         throw RpcException.unavailable("Place search failed: ${e.message}", SEARCH_HINT)
     }
 
-    private suspend fun routeOrNull(waypoints: List<LatLng>, warnings: MutableList<String>): List<LatLng>? = try {
-        router.route(waypoints).points
+    private fun travelFor(metersPerSecond: Double?) = Travel.forSpeed(metersPerSecond?.let(::Speed) ?: DEFAULT_SPEED)
+
+    private suspend fun routeOrNull(waypoints: List<LatLng>, warnings: MutableList<String>, travel: Travel): List<LatLng>? = try {
+        router.route(waypoints, travel).points
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {

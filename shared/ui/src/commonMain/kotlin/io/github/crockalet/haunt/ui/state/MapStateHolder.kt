@@ -15,6 +15,7 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.core.currentFix
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -81,7 +82,7 @@ class MapStateHolder(
         measured?.takeIf { it.points == points } ?: MeasuredLine(points).also { measured = it }
 
     /** Stops the road preview is (being) fetched for; null when none is wanted. */
-    private var roadsTarget: List<LatLng>? = null
+    private var roadsTarget: Pair<List<LatLng>, Travel>? = null
     private var roadsJob: Job? = null
 
     init {
@@ -303,12 +304,13 @@ class MapStateHolder(
             followRoads = local.followRoads && track == null,
             playbackRate = if (timed) local.rate.toDouble() else null,
             routed = local.currentRoads()?.points,
+            travel = local.travel,
         )
         launchCommand {
             val outcome = commands.playRoute(request)
             val stops = request.route.points
             // Keep the routed line on the map once the route ends, too.
-            val roads = if (request.followRoads && request.routed == null && local.draftRoute == stops) RoadsPreview(stops, outcome.points) else local.roads
+            val roads = if (request.followRoads && request.routed == null && local.draftRoute == stops) RoadsPreview(stops, request.travel, outcome.points) else local.roads
             local = local.copy(playingRoute = outcome.points, roads = roads)
             outcome.warning?.let { showNotice(Notice(it, error = false)) }
         }
@@ -343,22 +345,24 @@ class MapStateHolder(
     private fun refreshRoads(l: LocalUiState) {
         if (!commands.canFollowRoads) return
         val stops = l.draftRoute.takeIf { l.mode == MapMode.Route && l.followsRoads }
-        if (stops == roadsTarget) return
-        roadsTarget = stops
+        val target = stops?.let { it to l.travel }
+        if (target == roadsTarget) return
+        roadsTarget = target
         roadsJob?.cancel()
         roadsJob = null
-        if (stops == null || l.roads?.let { it.stops == stops && it.points != null } == true) return
-        localState = l.copy(roads = RoadsPreview(stops))
+        val travel = l.travel
+        if (stops == null || l.roads?.let { it.stops == stops && it.travel == travel && it.points != null } == true) return
+        localState = l.copy(roads = RoadsPreview(stops, travel))
         roadsJob = scope.launch {
             delay(ROADS_DEBOUNCE_MILLIS)
             val result = try {
-                RoadsPreview(stops, points = commands.routeAlongRoads(stops))
+                RoadsPreview(stops, travel, points = commands.routeAlongRoads(stops, travel))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                RoadsPreview(stops, error = e.message ?: "Couldn't follow roads")
+                RoadsPreview(stops, travel, error = e.message ?: "Couldn't follow roads")
             }
-            if (roadsTarget != stops) return@launch
+            if (roadsTarget != target) return@launch
             local = local.copy(roads = result)
             if (result.error != null) showNotice(Notice(result.error, ROADS_HINT))
         }

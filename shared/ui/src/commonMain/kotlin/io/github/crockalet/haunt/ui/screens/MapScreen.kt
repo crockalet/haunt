@@ -464,7 +464,7 @@ private fun RouteCard(route: RouteDetails, actions: MapActions) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Follow roads", style = HauntTheme.type.bodyStrong)
                 route.roadsNote?.let {
-                    Text(it, style = HauntTheme.type.small, color = if (route.roadsFailed) c.danger else c.muted, maxLines = 2)
+                    Text(it, style = HauntTheme.type.small, color = c.muted, maxLines = 2)
                 }
             }
             Switch(route.followRoads, actions.onFollowRoads, contentDescription = "Follow roads")
