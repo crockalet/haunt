@@ -44,6 +44,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -108,6 +110,8 @@ data class MapActions(
     val onJoystickMaxSpeed: (Float) -> Unit = {},
     val onJoystickSize: (JoystickSize) -> Unit = {},
     val onFloatingJoystick: (Boolean) -> Unit = {},
+    /** Ask for "Display over other apps" (the floating joystick's permission). */
+    val onAllowOverlay: () -> Unit = {},
     /** The pad was dragged to a new offset (dp from its default spot); persist it. */
     val onJoystickMoved: (xDp: Float, yDp: Float) -> Unit = { _, _ -> },
     /** Locate button (real device location); null hides it. */
@@ -162,8 +166,9 @@ fun MapScreen(
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 18.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
+                    // Shown in Joystick mode right away, but it only steers once Start has started the joystick.
                     AnimatedVisibility(
-                        state.joystick?.live == true,
+                        state.joystick != null,
                         enter = fadeIn(HauntMotion.snappy()),
                         exit = fadeOut(HauntMotion.snappy()),
                     ) {
@@ -217,7 +222,7 @@ fun MapScreen(
                     val fromBottom = toolbar.findRootCoordinates().size.height - toolbar.boundsInRoot().top
                     actions.onBottomChrome(with(density) { fromBottom.toDp() })
                 },
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Toolbar(state, actions)
@@ -236,7 +241,8 @@ private fun StartStop(state: MapUiState, actions: MapActions) {
     val start = state.startAction
     val stopLabel = if (state.route?.started == true) "Stop route" else "Stop haunting"
     if (start != null && state.active) {
-        GlassIconButton(HauntIcons.Stop, stopLabel, actions.onStop, size = 52.dp, iconSize = 18.dp)
+        // Small enough that toolbar + Stop + Start fit a 360 dp wide phone.
+        GlassIconButton(HauntIcons.Stop, stopLabel, actions.onStop, size = 44.dp, iconSize = 16.dp)
     }
     if (start != null || !state.active) {
         StartButton(onClick = actions.onStart, enabled = start != null, contentDescription = start ?: "Start haunting")
@@ -323,6 +329,7 @@ private fun MovableJoystick(j: JoystickDetails, areaBounds: Bounds, actions: Map
             onInput = actions.onJoystick,
             padSize = padSize,
             modifier = Modifier.padding(top = 12.dp, end = 12.dp),
+            enabled = j.live,
         )
         JoystickGrip(
             onDrag = { d -> live = clamp((live ?: stored) + Offset(d.x / density.density, d.y / density.density)) },
@@ -518,5 +525,21 @@ private fun JoystickCard(j: JoystickDetails, actions: MapActions) {
             }
             Switch(j.floating, actions.onFloatingJoystick, contentDescription = "Float over other apps")
         }
+        if (j.floatingNeedsPermission) OverlayPermissionRow(actions.onAllowOverlay)
+    }
+}
+
+/** The floating joystick is on but Android won't draw it over other apps yet; [onAllow] asks for that. */
+@Composable
+internal fun OverlayPermissionRow(onAllow: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Needs “Display over other apps”",
+            Modifier.weight(1f),
+            style = HauntTheme.type.small,
+            color = HauntTheme.colors.muted,
+            maxLines = 2,
+        )
+        Chip("Allow", selected = true, onClick = onAllow, modifier = Modifier.semantics { contentDescription = "Allow display over other apps" })
     }
 }

@@ -5,6 +5,8 @@ import io.github.crockalet.haunt.android.data.ActivitySource
 import io.github.crockalet.haunt.android.data.FavoritesStore
 import io.github.crockalet.haunt.android.data.HistoryEntry
 import io.github.crockalet.haunt.android.settings.HauntSettings
+import io.github.crockalet.haunt.android.settings.InMemoryKeyValueStore
+import io.github.crockalet.haunt.android.settings.SettingsStore
 import io.github.crockalet.haunt.android.settings.ThemeMode
 import io.github.crockalet.haunt.android.settings.Units
 import io.github.crockalet.haunt.android.ui.OnboardingFlow
@@ -25,10 +27,14 @@ import io.github.crockalet.haunt.ui.screens.OnboardingStep
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.LocalUiState
+import io.github.crockalet.haunt.ui.state.MapMode
+import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.RouteRequest
 import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.theme.FolderColors
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -47,6 +53,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class UiMappingTest {
     private val utc: ZoneId = ZoneOffset.UTC
@@ -229,6 +236,55 @@ class AndroidCommandsTest {
         c.startJoystick(Speed.kmh(12.0), a)
         assertEquals(a, assertIs<HauntState.Joystick>(h.controller.state.value).fix.position)
         assertEquals(1, env.started)
+    }
+
+    @Test
+    fun startInJoystickModeReplacesARunningPinAndShowsThePad() = runTest {
+        val (c, h) = commands()
+        val holder = MapStateHolder(h.controller, defaults = HauntDefaults(), commands = c, scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
+        val pin = LatLng(4.21179, 73.53994)
+        holder.onMapLongPress(pin)
+        holder.start()
+        holder.onEngineState(h.controller.state.value)
+        assertIs<HauntState.Holding>(h.controller.state.value)
+
+        holder.selectMode(MapMode.Joystick)
+        assertIs<HauntState.Holding>(h.controller.state.value) // switching mode leaves the pin running
+        assertEquals("Start joystick", holder.shown.startAction)
+        assertEquals(false, holder.shown.joystick?.live)
+
+        holder.start()
+        holder.onEngineState(h.controller.state.value)
+        assertEquals(pin, assertIs<HauntState.Joystick>(h.controller.state.value).fix.position)
+        assertNull(holder.notice)
+        assertEquals(true, holder.shown.joystick?.live)
+        assertNull(holder.shown.startAction)
+        assertEquals(2, env.started)
+        holder.joystickInput(90.0, 1.0)
+        advance(2.seconds)
+        assertTrue(assertIs<HauntState.Joystick>(h.controller.state.value).distanceMeters > 0.0)
+    }
+
+    @Test
+    fun floatingSettingRoundTripsThroughTheStoreAndTheMap() = runTest {
+        val (c, h) = commands()
+        val store = SettingsStore(InMemoryKeyValueStore())
+        val holder = MapStateHolder(
+            h.controller, LocalUiState(mode = MapMode.Joystick, expanded = true),
+            UiMapping.defaults(store.current), c, CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
+        )
+        // What MainActivity does: the switch → onDefaultsChange → store; the store → LaunchedEffect(settings) → holder.
+        fun toggle(on: Boolean) {
+            holder.defaults = holder.defaults.copy(floatingJoystick = on)
+            store.update { UiMapping.applyDefaults(it, holder.defaults) }
+            holder.defaults = UiMapping.defaults(store.current, holder.defaults)
+        }
+        toggle(true)
+        assertTrue(store.current.floatingJoystick)
+        assertEquals(true, holder.shown.joystick?.floating)
+        toggle(false)
+        assertTrue(!store.current.floatingJoystick)
+        assertEquals(false, holder.shown.joystick?.floating)
     }
 
     @Test

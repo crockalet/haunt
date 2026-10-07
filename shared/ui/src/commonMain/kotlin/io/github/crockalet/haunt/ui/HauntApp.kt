@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -120,6 +121,7 @@ fun HauntApp(
         val haze = if (liveBlur) rememberHazeState() else null
         val holder = state.map
         val colors = HauntTheme.colors
+        SideEffect { holder.canDrawOverlays = data.canDrawOverlays }
 
         PlatformBackHandler(enabled = state.screen != Screen.Map || holder.expanded) { state.back() }
 
@@ -253,6 +255,7 @@ internal fun rememberMapActions(state: HauntAppState, data: HauntAppData): MapAc
             onJoystickMaxSpeed = holder::setJoystickMaxSpeed,
             onJoystickSize = { size -> state.updateDefaults(currentData) { it.copy(joystickSize = size) } },
             onFloatingJoystick = { on -> state.updateDefaults(currentData) { it.copy(floatingJoystick = on) } },
+            onAllowOverlay = { currentData.onAllowOverlay() },
             onJoystickMoved = { x, y -> state.updateDefaults(currentData) { it.copy(joystickOffsetX = x, joystickOffsetY = y) } },
             onLocate = if (canLocate) {
                 { currentData.locateMe?.let(holder::locate) }
@@ -313,6 +316,7 @@ private fun Sheet(
                 services = data.services,
                 theme = state.theme,
                 defaults = holder.defaults,
+                floatingNeedsPermission = holder.defaults.floatingJoystick && !data.canDrawOverlays,
             ),
             actions = SettingsActions(
                 onBack = { state.back() },
@@ -333,6 +337,7 @@ private fun Sheet(
                 onUnits = { state.updateDefaults(data) { it.copy(metric = !it.metric) } },
                 onJoystickSize = { state.updateDefaults(data) { d -> d.copy(joystickSize = d.joystickSize.next(JoystickSize.entries)) } },
                 onFloatingJoystick = { on -> state.updateDefaults(data) { it.copy(floatingJoystick = on) } },
+                onAllowOverlay = data.onAllowOverlay,
                 onDataLicences = { state.navigate(Screen.DataLicences) },
             ),
         )

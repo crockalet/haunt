@@ -72,6 +72,7 @@ object JoystickMath {
  *
  * When not dragging, the knob shows [bearingDeg]/[magnitude] (hoisted state). While dragging the knob
  * position stays inside the pad: the caller needn't feed [onInput] back for the knob to follow.
+ * A disabled pad has a faded knob and ignores touches.
  */
 @Composable
 fun JoystickPad(
@@ -80,6 +81,7 @@ fun JoystickPad(
     onInput: (bearingDeg: Double, magnitude: Double) -> Unit,
     modifier: Modifier = Modifier,
     padSize: Dp = 140.dp,
+    enabled: Boolean = true,
 ) {
     val c = HauntTheme.colors
     val density = LocalDensity.current
@@ -102,36 +104,42 @@ fun JoystickPad(
         spring.animateTo(rest, HauntMotion.bouncy())
     }
 
+    val touch = if (!enabled) {
+        Modifier
+    } else {
+        Modifier.pointerInput(maxTravel) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            fun emit(p: Offset) {
+                var v = p - center
+                val len = v.getDistance()
+                if (len > maxTravel) v = v * (maxTravel / len)
+                drag = v
+                val (b, m) = JoystickMath.toPolar(v.x, v.y, maxTravel)
+                lastBearing = b
+                input(b, m)
+            }
+            detectDragGestures(
+                onDragStart = { emit(it) },
+                onDragEnd = {
+                    released = drag
+                    drag = null
+                    input(lastBearing, 0.0)
+                },
+                onDragCancel = {
+                    released = drag
+                    drag = null
+                    input(lastBearing, 0.0)
+                },
+                onDrag = { change, _ -> emit(change.position) },
+            )
+        }
+    }
+
     GlassSurface(
         modifier
             .size(padSize)
-            .semantics { contentDescription = "Joystick. Drag to move." }
-            .pointerInput(maxTravel) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                fun emit(p: Offset) {
-                    var v = p - center
-                    val len = v.getDistance()
-                    if (len > maxTravel) v = v * (maxTravel / len)
-                    drag = v
-                    val (b, m) = JoystickMath.toPolar(v.x, v.y, maxTravel)
-                    lastBearing = b
-                    input(b, m)
-                }
-                detectDragGestures(
-                    onDragStart = { emit(it) },
-                    onDragEnd = {
-                        released = drag
-                        drag = null
-                        input(lastBearing, 0.0)
-                    },
-                    onDragCancel = {
-                        released = drag
-                        drag = null
-                        input(lastBearing, 0.0)
-                    },
-                    onDrag = { change, _ -> emit(change.position) },
-                )
-            },
+            .semantics { contentDescription = if (enabled) "Joystick. Drag to move." else "Joystick. Press Start to steer." }
+            .then(touch),
         shape = HauntShapes.pill,
     ) {
         val tickInset = padSize * 0.07f
@@ -149,7 +157,7 @@ fun JoystickPad(
                 .size(knobSize)
                 .dropShadow(HauntShapes.pill, Shadow(radius = 14.dp, color = Color.Black.copy(alpha = 0.3f), offset = DpOffset(0.dp, 4.dp)))
                 .clip(HauntShapes.pill)
-                .background(c.accent)
+                .background(if (enabled) c.accent else c.accent.copy(alpha = 0.35f))
                 .border(3.dp, Color.White, HauntShapes.pill),
         )
     }

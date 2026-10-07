@@ -58,6 +58,9 @@ class MapStateHolder(
         }
     var defaults by mutableStateOf(defaults)
 
+    /** Whether the floating joystick may draw over other apps; only shown next to its setting. */
+    var canDrawOverlays by mutableStateOf(true)
+
     /** Banner over the map (errors with a hint, routing warnings…); null when nothing to say. */
     var notice by mutableStateOf<Notice?>(null)
         private set
@@ -89,13 +92,16 @@ class MapStateHolder(
         refreshRoads(initial)
     }
 
-    private val shownState = derivedStateOf(structuralEqualityPolicy()) { buildMapUiState(engine, local, defaults, ::measure) }
+    // `this.`: in an initializer a bare `defaults` is the constructor parameter, which never changes.
+    private val shownState = derivedStateOf(structuralEqualityPolicy()) {
+        buildMapUiState(engine, local, this.defaults, ::measure, canDrawOverlays)
+    }
     private val mapContentState = derivedStateOf(structuralEqualityPolicy()) { shownState.value.map }
     private val expandedState = derivedStateOf(structuralEqualityPolicy()) { local.expanded }
 
     /** Current UI state; reads engine state from [HauntController.state]. */
     val uiState: MapUiState
-        get() = buildMapUiState(controller.state.value, local, defaults, ::measure)
+        get() = buildMapUiState(controller.state.value, local, defaults, ::measure, canDrawOverlays)
 
     /** What the map screen shows (snapshot state): the last engine state passed to [onEngineState], plus [local]. */
     val shown: MapUiState

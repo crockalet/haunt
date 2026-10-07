@@ -16,6 +16,7 @@ import io.github.crockalet.haunt.ui.screens.OnboardingUiState
 import io.github.crockalet.haunt.ui.state.FakeHauntController
 import io.github.crockalet.haunt.ui.state.Geo
 import io.github.crockalet.haunt.ui.state.HauntAppData
+import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.LicenceDoc
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
@@ -138,6 +139,19 @@ class Screenshots {
     fun mapJoystick() {
         shot("05-map-joystick") { App(it, joystick, joyLocal) }
         shot("06-map-joystick-expanded") { App(it, joystick, joyLocal.copy(expanded = true)) }
+    }
+
+    /** Joystick mode while a pin still runs: the pad waits (dimmed) for Start; floating is on but not allowed yet. */
+    @Test
+    fun mapJoystickReady() {
+        shot("17-map-joystick-ready") { mode ->
+            val controller = FakeHauntController(holding, clock = { t0 })
+            val state = HauntAppState(
+                controller, Screen.Map, mode, pinLocal.copy(mode = MapMode.Joystick, expanded = true),
+                defaults = HauntDefaults(floatingJoystick = true),
+            )
+            HauntApp(controller = controller, data = HauntAppData.Sample.copy(canDrawOverlays = false), state = state)
+        }
     }
 
     @Test

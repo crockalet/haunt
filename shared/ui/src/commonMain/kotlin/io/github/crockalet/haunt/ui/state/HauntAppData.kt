@@ -41,6 +41,13 @@ data class HauntAppData(
     val locateMe: (suspend () -> LatLng)? = null,
     /** Settings → Defaults changed (update rate, accuracy, units); persist them. */
     val onDefaultsChange: (HauntDefaults) -> Unit = {},
+    /**
+     * The floating joystick may be drawn over other apps (Android's "Display over other apps").
+     * Only informs the UI: the "Float over other apps" setting is independent of it.
+     */
+    val canDrawOverlays: Boolean = true,
+    /** Asks for the overlay permission (opens the system screen). */
+    val onAllowOverlay: () -> Unit = {},
     /** Third-party libraries, licences and bundled notices for Settings → Data & licences. */
     val openSource: OpenSourceInfo = OpenSourceInfo(),
     /** Reads a bundled [OssNotice] by its path. */

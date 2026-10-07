@@ -86,8 +86,10 @@ data class JoystickDetails(
     /** Pad offset from its default spot, in dp. */
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
-    /** The engine is in joystick mode, so the pad steers; otherwise it waits for Start. */
+    /** The engine is in joystick mode, so the pad steers; otherwise it waits for Start (faded knob, no input). */
     val live: Boolean = true,
+    /** [floating] is on but Android doesn't allow drawing over other apps yet. */
+    val floatingNeedsPermission: Boolean = false,
 )
 
 /** What the map layer shows. */
@@ -183,7 +185,8 @@ fun buildMapUiState(
     engine: HauntState,
     local: LocalUiState,
     defaults: HauntDefaults = HauntDefaults(),
-): MapUiState = buildMapUiState(engine, local, defaults, ::MeasuredLine)
+    canDrawOverlays: Boolean = true,
+): MapUiState = buildMapUiState(engine, local, defaults, ::MeasuredLine, canDrawOverlays)
 
 /** [buildMapUiState] with [measure] supplying (typically cached) route measurements. */
 internal fun buildMapUiState(
@@ -191,6 +194,7 @@ internal fun buildMapUiState(
     local: LocalUiState,
     defaults: HauntDefaults,
     measure: (List<LatLng>) -> MeasuredLine,
+    canDrawOverlays: Boolean = true,
 ): MapUiState {
     val fix = engine.currentFix
     val active = engine !is HauntState.Idle
@@ -285,6 +289,7 @@ internal fun buildMapUiState(
             offsetX = defaults.joystickOffsetX,
             offsetY = defaults.joystickOffsetY,
             live = j != null,
+            floatingNeedsPermission = defaults.floatingJoystick && !canDrawOverlays,
         )
     } else null
 

@@ -293,7 +293,8 @@ so it shares across platforms and is not tied to Material.
   result / favourite / history entry, or adding stops only *prepare* (a ring marks the
   picked spot); nothing is faked until **Start**, and only **Stop** ends it. Switching mode leaves the
   running spoof untouched (the status chip keeps saying what is haunted); Start in the new mode replaces it
-  without a gap, and a small Stop sits beside Start meanwhile. The stick only steers once the joystick runs.
+  without a gap, and a small Stop sits beside Start meanwhile (sized so toolbar + Stop + Start fit 360 dp).
+  The stick only steers once the joystick runs.
 - Expanding opens a glass details card above the toolbar (place, coordinates, altitude/accuracy/rate;
   route progress, speed presets, follow roads, loop mode; joystick speed).
 - Locate button (bottom-right): finds the device's **real** location and moves the camera there; it never
@@ -302,9 +303,15 @@ so it shares across platforms and is not tied to Material.
   return the fake position, so it uses the last real fix seen (≤ 30 min) or asks to stop haunting first.
   Opening Haunt while idle centres the map on the real position.
 - Joystick mode: thumbstick over the map, bottom-left by default; drag the grip on its corner to move it
-  (position remembered). Pad size S / M / L / XL. Optional **floating joystick** (E3): with "Float over other
-  apps" on and the permission granted, the pad is drawn over other apps (`TYPE_APPLICATION_OVERLAY`, hosted
-  by `HauntService`) while joystick mode runs and Haunt is in the background; draggable, with an "open Haunt" button.
+  (position remembered). It is shown as soon as Joystick mode is selected: until Start it waits with a faded
+  knob and ignores touches (screenshot `17-map-joystick-ready`). Pad size S / M / L / XL. Optional
+  **floating joystick** (E3): "Float over other apps" is a plain app setting (Settings → Joystick and the
+  joystick card) that always toggles and persists. The "Display over other apps" permission is separate:
+  while the setting is on without it, both places show "Needs “Display over other apps” · Allow" (opens
+  the system screen); the first time the setting is turned on without it, Haunt asks once. Permission is
+  re-read on resume and whenever the overlay's inputs change, so granting it needs no restart; it never
+  flips the setting. With both, the pad is drawn over other apps (`TYPE_APPLICATION_OVERLAY`, hosted by
+  `HauntService`) while joystick mode runs and Haunt is in the background; draggable, with an "open Haunt" button.
 
 **Search:** full-screen glass sheet over a blurred map; detects pasted coordinates ("Pick here"), nearby places, recent.
 **Library:** Favourites (folders) · History · Tracks; import GPX / KML.

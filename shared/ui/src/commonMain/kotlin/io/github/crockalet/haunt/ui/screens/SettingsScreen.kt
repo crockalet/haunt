@@ -56,6 +56,8 @@ data class SettingsUiState(
     val services: List<ServiceEndpoint> = emptyList(),
     val theme: ThemeMode = ThemeMode.System,
     val defaults: HauntDefaults = HauntDefaults(),
+    /** "Float over other apps" is on but Android doesn't allow it yet. */
+    val floatingNeedsPermission: Boolean = false,
 )
 
 @Immutable
@@ -71,6 +73,7 @@ data class SettingsActions(
     val onUnits: () -> Unit = {},
     val onJoystickSize: () -> Unit = {},
     val onFloatingJoystick: (Boolean) -> Unit = {},
+    val onAllowOverlay: () -> Unit = {},
     val onDataLicences: () -> Unit = {},
 )
 
@@ -226,6 +229,9 @@ fun SettingsScreen(
                         Switch(state.defaults.floatingJoystick, actions.onFloatingJoystick, contentDescription = "Float over other apps")
                     },
                 )
+                if (state.floatingNeedsPermission) {
+                    OverlayPermissionRow(actions.onAllowOverlay, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
+                }
             }
         }
 

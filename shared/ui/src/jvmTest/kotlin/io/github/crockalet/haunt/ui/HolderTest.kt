@@ -11,6 +11,8 @@ import io.github.crockalet.haunt.core.Speed
 import io.github.crockalet.haunt.core.Travel
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntCommands
+import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.MapStateHolder
@@ -410,6 +412,17 @@ class HolderTest {
         assertTrue(c.calls.isEmpty() && !commands.any)
         holder.start()
         assertEquals(listOf(b), commands.joysticks)
+    }
+
+    @Test
+    fun shownFollowsDefaultsChangedAfterConstruction() {
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Joystick), HauntDefaults())
+        holder.defaults = HauntDefaults(floatingJoystick = true, joystickSize = JoystickSize.Small, joystickOffsetX = 10f, joystickOffsetY = -20f, accuracyMeters = 20f)
+        val j = assertNotNull(holder.shown.joystick)
+        assertEquals(true to JoystickSize.Small, j.floating to j.size)
+        assertEquals(10f to -20f, j.offsetX to j.offsetY)
+        holder.selectMode(MapMode.Pin)
+        assertEquals("±20 m", holder.shown.pin?.accuracy)
     }
 
     @Test
