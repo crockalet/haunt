@@ -135,7 +135,8 @@ internal fun MapAttributionOverlay(links: List<AttributionLink>, state: Attribut
         Modifier.fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .then(bottom)
-            .padding(start = 12.dp, end = 12.dp),
+            // Wraps short of the locate button, which sits bottom-right at the same height.
+            .padding(start = 12.dp, end = 12.dp + LocateButtonColumn),
         contentAlignment = Alignment.BottomStart,
     ) {
         CompositionLocalProvider(LocalGlassMode provides GlassMode.Solid) {
@@ -143,6 +144,9 @@ internal fun MapAttributionOverlay(links: List<AttributionLink>, state: Attribut
         }
     }
 }
+
+/** Locate button (52 dp) plus its 12 dp end margin and an 8 dp gap. */
+private val LocateButtonColumn = 72.dp
 
 /** Glass pill with the linked credits and an (i) button that folds / unfolds them. */
 @Composable
