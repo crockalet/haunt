@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -313,15 +314,60 @@ class HolderTest {
     // --- Locate button ----------------------------------------------------------------------
 
     @Test
-    fun locateInPinModePicksMyLocation() {
+    fun locateOnlyMovesTheCameraInEveryMode() {
+        for (mode in MapMode.entries) {
+            val c = RecordingController()
+            val commands = RecordingCommands()
+            val holder = MapStateHolder(c, LocalUiState(mode = mode, draftRoute = listOf(a)), commands = commands)
+            holder.locate { b }
+            assertEquals(emptyList(), commands.locations, "$mode")
+            assertEquals(emptyList(), c.calls, "$mode")
+            assertEquals(mode, holder.local.mode)
+            assertEquals(listOf(a), holder.local.draftRoute)
+            assertNull(holder.local.lastPosition)
+            assertNull(holder.local.cameraOverride)
+            assertEquals(false, holder.local.locating)
+            assertEquals(b, assertNotNull(holder.uiState.map.focus).target)
+        }
+    }
+
+    @Test
+    fun locatingTheSameSpotAgainIsANewFocus() {
+        val holder = MapStateHolder(RecordingController())
+        holder.locate { a }
+        val first = assertNotNull(holder.shown.map.focus)
+        holder.locate { a }
+        val second = assertNotNull(holder.shown.map.focus)
+        assertEquals(a, second.target)
+        assertNotEquals(first, second)
+    }
+
+    @Test
+    fun searchResultInRouteModeAddsAStopAndFocusesIt() {
         val commands = RecordingCommands()
-        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Pin), commands = commands)
-        holder.locate { b }
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route, draftRoute = listOf(a)), commands = commands)
+        holder.pick(b, "Somewhere")
+        assertEquals(listOf(a, b), holder.local.draftRoute)
+        assertEquals(b, assertNotNull(holder.shown.map.focus).target)
+        assertTrue(commands.locations.isEmpty())
+    }
+
+    @Test
+    fun searchResultInPinModePicksAndFocusesIt() {
+        val commands = RecordingCommands()
+        val holder = MapStateHolder(RecordingController(), commands = commands)
+        holder.pick(b, "Somewhere")
         assertTrue(!commands.any)
         assertEquals(b, holder.local.pendingSpot)
-        assertEquals(false, holder.local.locating)
-        holder.start()
-        assertEquals(listOf<Pair<LatLng, String?>>(b to MapStateHolder.MY_LOCATION_LABEL), commands.locations)
+        assertEquals(b, assertNotNull(holder.shown.map.focus).target)
+    }
+
+    @Test
+    fun longPressDoesNotMoveTheCamera() {
+        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route), commands = RecordingCommands())
+        holder.onMapLongPress(a)
+        assertEquals(listOf(a), holder.local.draftRoute)
+        assertNull(holder.shown.map.focus)
     }
 
     @Test
@@ -409,36 +455,14 @@ class HolderTest {
     }
 
     @Test
-    fun locateInJoystickModePicksWhereStartPutsTheStick() {
-        val c = RecordingController(HauntState.Joystick(fix, Speed.kmh(12.0), 0.0, 0.0))
-        val commands = RecordingCommands()
-        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick), commands = commands)
+    fun locateWhileARoutePlaysStopsFollowingTheGhost() {
+        val c = RecordingController(moving())
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Route, draftRoute = listOf(b)))
         holder.locate { b }
-        assertTrue(c.calls.isEmpty() && !commands.any)
-        assertEquals("Start joystick", holder.uiState.startAction)
-        holder.start()
-        assertEquals(listOf(b), commands.joysticks)
-        assertNull(holder.local.pendingSpot)
-    }
-
-    @Test
-    fun locateInRouteModeBecomesTheFirstStopOnce() {
-        val far = LatLng(1.0, 1.0)
-        val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Route, draftRoute = listOf(far)))
-        holder.locate { a }
-        assertEquals(listOf(a, far), holder.local.draftRoute)
-        // Tapping again (a few metres away) doesn't add a duplicate start.
-        holder.locate { LatLng(0.0001, 0.0) }
-        assertEquals(listOf(a, far), holder.local.draftRoute)
-        assertEquals(LatLng(0.0001, 0.0), holder.local.cameraOverride)
-    }
-
-    @Test
-    fun locateWhileARoutePlaysOnlyMovesTheCamera() {
-        val holder = MapStateHolder(RecordingController(moving()), LocalUiState(mode = MapMode.Route, draftRoute = listOf(b)))
-        holder.locate { a }
         assertEquals(listOf(b), holder.local.draftRoute)
-        assertEquals(a, holder.local.cameraOverride)
+        assertEquals(emptyList(), c.calls)
+        assertEquals(b, holder.uiState.map.camera)
+        assertEquals(b, assertNotNull(holder.uiState.map.focus).target)
     }
 
     @Test

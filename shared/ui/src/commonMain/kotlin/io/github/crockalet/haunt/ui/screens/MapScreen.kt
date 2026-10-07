@@ -41,11 +41,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.LoopMode
@@ -110,6 +112,8 @@ data class MapActions(
     val onJoystickMoved: (xDp: Float, yDp: Float) -> Unit = { _, _ -> },
     /** Locate button (real device location); null hides it. */
     val onLocate: (() -> Unit)? = null,
+    /** Height from the bottom of the window that the map's attribution must clear (toolbar and locate button). */
+    val onBottomChrome: (Dp) -> Unit = {},
 )
 
 /**
@@ -176,7 +180,7 @@ fun MapScreen(
                     }
                 }
                 actions.onLocate?.let { onLocate ->
-                    LocateButton(state.locating, onLocate, Modifier.padding(end = 12.dp, bottom = 12.dp))
+                    LocateButton(state.locating, onLocate, Modifier.padding(end = 12.dp, bottom = LocateButtonGap))
                 }
             }
             AnimatedVisibility(
@@ -206,8 +210,14 @@ fun MapScreen(
                     }
                 }
             }
+            val density = LocalDensity.current
+            val locateClearance = if (actions.onLocate != null) LocateButtonSize + LocateButtonGap else 0.dp
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().onGloballyPositioned { toolbar ->
+                    // Measured from the window bottom, which is also the map's (it fills the window).
+                    val fromBottom = toolbar.findRootCoordinates().size.height - toolbar.boundsInRoot().top
+                    actions.onBottomChrome(with(density) { fromBottom.toDp() } + locateClearance)
+                },
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -236,7 +246,7 @@ private fun StartStop(state: MapUiState, actions: MapActions) {
     }
 }
 
-/** Round glass button: centre on / start from the device's real location. Spins while locating. */
+/** Round glass button: centres the map on the device's real location. Spins while locating. */
 @Composable
 private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     // Spin the icon only; rotating the glass would re-blur it every frame.
@@ -249,13 +259,16 @@ private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modif
     }
     GlassIconButton(
         icon = if (locating) HauntIcons.Spinner else HauntIcons.Locate,
-        contentDescription = if (locating) "Finding your location" else "Start from my location",
+        contentDescription = if (locating) "Finding your location" else "Show my location",
         onClick = onClick,
         modifier = modifier,
-        size = 52.dp,
+        size = LocateButtonSize,
         iconModifier = spin,
     )
 }
+
+private val LocateButtonSize = 52.dp
+private val LocateButtonGap = 12.dp
 
 private class LastJoystick {
     var value: JoystickDetails? = null

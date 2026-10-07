@@ -153,9 +153,10 @@ class MapStateHolder(
 
     /**
      * A place from search or the library. Route mode (no route playing) adds it as a stop; otherwise
-     * it becomes the pending spot in Pin mode. Nothing is haunted until [start].
+     * it becomes the pending spot in Pin mode. Moves the camera to it. Nothing is haunted until [start].
      */
     fun pick(position: LatLng, label: String?) {
+        focus(position)
         if (local.mode == MapMode.Route && controller.state.value !is HauntState.Moving) {
             addStop(position)
             return
@@ -169,29 +170,9 @@ class MapStateHolder(
     }
 
     /**
-     * "Start from where I am": [position] is the device's real location. Pin and joystick mode pick
-     * it for Start; route mode makes it the first stop (unless it already is). While a route plays
-     * it only moves the camera.
+     * Locate button: asks [locateMe] for the device's real location and moves the camera there.
+     * Never haunts anything. Ignored while one is running.
      */
-    fun useMyLocation(position: LatLng) {
-        when (local.mode) {
-            MapMode.Pin, MapMode.Joystick -> {
-                local = local.copy(cameraOverride = null)
-                pickSpot(position, MY_LOCATION_LABEL)
-            }
-            MapMode.Route -> {
-                if (controller.state.value is HauntState.Moving) {
-                    showOnMap(position)
-                    return
-                }
-                val first = local.draftRoute.firstOrNull()
-                val draft = if (first != null && Geo.distance(first, position) < SAME_STOP_METERS) local.draftRoute else listOf(position) + local.draftRoute
-                local = local.copy(draftRoute = draft, draftName = null, draftTrack = null, cameraOverride = position)
-            }
-        }
-    }
-
-    /** Locate button: asks [locateMe] for the real location, then [useMyLocation]. Ignored while one is running. */
     fun locate(locateMe: suspend () -> LatLng) {
         if (local.locating) return
         local = local.copy(locating = true)
@@ -199,7 +180,10 @@ class MapStateHolder(
             try {
                 val position = locateMe()
                 local = local.copy(locating = false)
-                useMyLocation(position)
+                val engine = controller.state.value
+                // Otherwise the camera would snap straight back to the moving ghost.
+                if (engine is HauntState.Moving || engine is HauntState.Joystick) showOnMap(position)
+                focus(position)
             } catch (e: CancellationException) {
                 local = local.copy(locating = false)
                 throw e
@@ -213,6 +197,11 @@ class MapStateHolder(
     /** Move the camera to [position] without haunting it. */
     fun showOnMap(position: LatLng) {
         local = local.copy(cameraOverride = position)
+    }
+
+    /** Animate the camera to [position] once, even if it was the last focus too. */
+    private fun focus(position: LatLng) {
+        local = local.copy(cameraFocus = CameraFocus(position, (local.cameraFocus?.id ?: 0) + 1))
     }
 
     // --- Route -------------------------------------------------------------------------------
@@ -392,12 +381,6 @@ class MapStateHolder(
     companion object {
         /** Range of the Custom speed editor (km/h). */
         val CustomSpeedRangeKmh = 1f..150f
-
-        /** Label of the place set by the locate button. */
-        const val MY_LOCATION_LABEL = "My location"
-
-        /** A first stop closer than this to "my location" counts as already starting there. */
-        private const val SAME_STOP_METERS = 25.0
     }
 }
 

@@ -1,6 +1,8 @@
 package io.github.crockalet.haunt.ui.map
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -27,6 +29,7 @@ import org.maplibre.compose.interaction.MapInteractions
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.rememberMapState
+import org.maplibre.compose.overlay.LocalViewportInsets
 import org.maplibre.compose.overlay.MapOverlay
 import org.maplibre.compose.overlay.include
 import org.maplibre.compose.sources.GeoJsonData
@@ -60,6 +63,7 @@ actual fun HauntMap(
     style: MapStyle,
     onLongPress: (LatLng) -> Unit,
     modifier: Modifier,
+    bottomInset: Dp,
 ) {
     if (LocalInspectionMode.current) {
         DrawnMap(content, onLongPress, modifier)
@@ -105,6 +109,11 @@ actual fun HauntMap(
         if (content.follow) mapState.animateCamera(CameraUpdate(target = target.toPosition()))
     }
 
+    LaunchedEffect(content.focus) {
+        val focus = content.focus ?: return@LaunchedEffect
+        mapState.animateCamera(CameraUpdate(target = focus.target.toPosition()))
+    }
+
     // Derived so camera frames (every frame while following) only recompose the overlay when the halo's size changes.
     val accuracy by rememberUpdatedState(content.accuracyMeters)
     val halo by remember(mapState) {
@@ -129,7 +138,10 @@ actual fun HauntMap(
         state = mapState,
         interactions = interactions,
         overlay = {
-            include(MapOverlay.AttributionOnly)
+            // Overlay-only insets: the camera keeps centring on the whole map.
+            CompositionLocalProvider(LocalViewportInsets provides PaddingValues(bottom = bottomInset)) {
+                include(MapOverlay.AttributionOnly)
+            }
             content.route.firstOrNull()?.let { RouteEndpoint(start = true, modifier = Modifier.placedAt(it.toPosition())) }
             if (content.route.size >= 2) RouteEndpoint(start = false, modifier = Modifier.placedAt(content.route.last().toPosition()))
             content.pending?.let { RouteEndpoint(start = false, modifier = Modifier.placedAt(it.toPosition())) }

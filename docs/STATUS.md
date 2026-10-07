@@ -30,7 +30,7 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
      Haunt" button. In-app pad grip drag + clamping, all four pad sizes. Morph/spring animations feel right on device.
    - Map style: Haunt light / dark style loads (glyphs + tiles from OpenFreeMap), switches with the theme,
      custom style URL in Settings → Map style still works.
-   - Locate button: real fix when idle (Pin / Joystick / Route behaviours), cached fix or hint while faking, map
+   - Locate button: camera moves to the real fix (no faking started), cached fix or hint while faking, map
      opens on the real position. Swiping Haunt from Recents stops faking, the notification and both services.
 2. **Gaps to close**: OSRM public demo only serves `driving` (walking routes follow car roads unless the user points Settings → Routing at a server with a `foot` profile; consider defaulting walk/cycle routes to a public foot/bike server, or a Valhalla backend). Done 2026-10-06: Haunt's own map style (`HauntMapStyle`: light / dark from the theme palette over OpenFreeMap tiles, no icons; previews `docs/screenshots/14-map-style-*.png` rendered with MapLibre GL JS), service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
 3. **Release prep (M5)**: release signing, F-Droid metadata, Play listing "Haunt: Fake GPS Location" (Play may ask about the `specialUse` FGS), CLI distribution (fat JAR now; consider GraalVM native image / Homebrew).

@@ -76,7 +76,6 @@ import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.MapStyle
-import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.Place
 import io.github.crockalet.haunt.ui.state.detectCoordinates
@@ -122,7 +121,7 @@ fun HauntApp(
         // Blur at reduced resolution: indistinguishable at these radii, far cheaper while things move.
         CompositionLocalProvider(LocalHazeState provides haze, LocalHazePerformanceMode provides HazePerformanceMode.Performance) {
             Box(modifier.fillMaxSize().background(colors.map)) {
-                MapBackground(holder, mapStyle, Modifier.fillMaxSize().then(if (haze != null) Modifier.hazeSource(haze) else Modifier))
+                MapBackground(state, mapStyle, Modifier.fillMaxSize().then(if (haze != null) Modifier.hazeSource(haze) else Modifier))
 
                 val onboarding = state.onboarding
                 if (onboarding != null) {
@@ -194,12 +193,14 @@ private val Screen.depth: Int
 
 /** The map alone in its own scope: engine ticks recompose it (and [MapLayer]), not the whole app. */
 @Composable
-private fun MapBackground(holder: MapStateHolder, style: MapStyle, modifier: Modifier) {
+private fun MapBackground(state: HauntAppState, style: MapStyle, modifier: Modifier) {
+    val holder = state.map
     HauntMap(
         content = holder.mapContent,
         style = style,
         onLongPress = holder::onMapLongPress,
         modifier = modifier,
+        bottomInset = state.mapBottomInset,
     )
 }
 
@@ -252,6 +253,7 @@ internal fun rememberMapActions(state: HauntAppState, data: HauntAppData): MapAc
             } else {
                 null
             },
+            onBottomChrome = { state.mapBottomInset = it },
         )
     }
 }

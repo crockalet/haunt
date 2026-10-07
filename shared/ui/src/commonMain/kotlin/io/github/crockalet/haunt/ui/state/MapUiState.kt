@@ -106,7 +106,13 @@ data class MapContent(
     val camera: LatLng?,
     /** True when the camera should keep following [camera]. */
     val follow: Boolean,
+    /** Latest one-off camera move; the map animates to it once per new [CameraFocus.id]. */
+    val focus: CameraFocus? = null,
 )
+
+/** A request to move the camera to [target] once, without following it. [id] makes asking again for the same spot a new request. */
+@Immutable
+data class CameraFocus(val target: LatLng, val id: Int)
 
 /** UI-only state the engine doesn't know about (mode, card, presets…). */
 @Immutable
@@ -140,6 +146,8 @@ data class LocalUiState(
     /** Spot picked on the map, in search or the library: Pin mode haunts it, Joystick mode starts there, on Start. */
     val pendingSpot: LatLng? = null,
     val pendingLabel: String? = null,
+    /** Last camera move asked for by the locate button, a search result or a new stop. */
+    val cameraFocus: CameraFocus? = null,
     /** The locate button is waiting for the device's real location. */
     val locating: Boolean = false,
 )
@@ -303,6 +311,7 @@ internal fun buildMapUiState(
             pending = pending,
             camera = local.cameraOverride ?: pending ?: position,
             follow = local.cameraOverride != null || pending != null || engine is HauntState.Moving || engine is HauntState.Joystick,
+            focus = local.cameraFocus,
         ),
     )
 }

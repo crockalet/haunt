@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.use
 import io.github.crockalet.haunt.core.Fix
 import io.github.crockalet.haunt.core.HauntState
@@ -72,6 +74,27 @@ class MapActionsTest {
                     actions = rememberMapActions(state, HauntAppData(locateMe = { a }))
                 }.use { it.render(0) }
                 assertNotNull(assertNotNull(actions).onLocate)
+            }.exceptionOrNull()
+        }
+        failure?.let { throw it }
+    }
+
+    @Test
+    fun mapBottomInsetClearsTheToolbarAndLocateButton() {
+        var failure: Throwable? = null
+        SwingUtilities.invokeAndWait {
+            failure = runCatching {
+                fun inset(data: HauntAppData): Dp {
+                    val state = HauntAppState(FakeHauntController(HauntState.Idle, clock = { 0L }), Screen.Map, ThemeMode.Light)
+                    ImageComposeScene(400, 800, Density(1f)) {
+                        HauntApp(state.map.controller, data = data, state = state)
+                    }.use { scene -> repeat(3) { scene.render(it * 500_000_000L) } }
+                    return state.mapBottomInset
+                }
+                val toolbarOnly = inset(HauntAppData())
+                // Toolbar row (≥ 40 dp) plus the 18 dp bottom margin, well under the screen height.
+                assertTrue(toolbarOnly in 58.dp..200.dp, "inset $toolbarOnly")
+                assertEquals(toolbarOnly + 64.dp, inset(HauntAppData(locateMe = { a })))
             }.exceptionOrNull()
         }
         failure?.let { throw it }
