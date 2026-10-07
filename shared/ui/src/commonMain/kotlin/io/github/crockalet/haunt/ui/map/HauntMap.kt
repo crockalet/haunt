@@ -11,7 +11,7 @@ import io.github.crockalet.haunt.ui.state.MapStyle
  * map colours by default, see [HauntMapStyle]); other targets draw [DrawnMap], an illustrative stand-in.
  *
  * Shows the ghost marker + accuracy halo at [MapContent.fix], the route polyline and joystick
- * trail, and reports long-presses via [onLongPress].
+ * trail, a ring at the [MapContent.pending] spot, and reports long-presses via [onLongPress].
  */
 @Composable
 expect fun HauntMap(

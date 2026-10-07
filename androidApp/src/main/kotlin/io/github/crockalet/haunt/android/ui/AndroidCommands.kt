@@ -2,6 +2,8 @@ package io.github.crockalet.haunt.android.ui
 
 import io.github.crockalet.haunt.android.control.TrackedController
 import io.github.crockalet.haunt.android.net.Router
+import io.github.crockalet.haunt.core.LatLng
+import io.github.crockalet.haunt.core.Speed
 import io.github.crockalet.haunt.protocol.HauntApi
 import io.github.crockalet.haunt.protocol.RoutePlayParams
 import io.github.crockalet.haunt.protocol.RpcException
@@ -26,6 +28,7 @@ import kotlinx.coroutines.withContext
  *   first (same [Router] the API uses) so the UI can draw the road-following line it plays.
  * - Recorded tracks (timestamps or altitudes, which waypoints can't carry) → after the same
  *   [checkCanMock], straight to the tracked [controller] (route ids and finish events stay right).
+ * - Joystick (no API method) → [checkCanMock], then the [controller].
  */
 class AndroidCommands(
     private val api: HauntApi,
@@ -36,7 +39,7 @@ class AndroidCommands(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : HauntCommands {
 
-    override suspend fun setLocation(position: io.github.crockalet.haunt.core.LatLng, accuracy: Float?, label: String?) {
+    override suspend fun setLocation(position: LatLng, accuracy: Float?, label: String?) {
         call { api.setLocation(SetLocationParams(lat = position.lat, lng = position.lng, accuracy = accuracy, label = label)) }
     }
 
@@ -77,6 +80,12 @@ class AndroidCommands(
             ),
         )
         RouteOutcome(points, listOfNotNull(warning, result.warning).joinToString("; ").ifEmpty { null })
+    }
+
+    override suspend fun startJoystick(maxSpeed: Speed, from: LatLng) = call {
+        checkCanMock()
+        controller.startJoystick(maxSpeed, from)
+        onMockingStarted()
     }
 
     private suspend fun <T> call(block: suspend () -> T): T = withContext(dispatcher) {

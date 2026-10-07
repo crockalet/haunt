@@ -287,11 +287,16 @@ so it shares across platforms and is not tied to Material.
 **Map screen** (single main screen; map takes the full screen, no bottom nav)
 - Top: glass search pill (places + coordinate paste) with Library and Settings buttons; a status chip below it.
 - Bottom, **collapsed by default:** a floating toolbar with **Pin · Route · Joystick**
-  (+ pause in Route mode) and an expand arrow, plus a separate round **Stop** button.
+  (+ pause while a route plays) and an expand arrow, plus a separate round **Start / Stop** button.
+- **Starting and stopping are always explicit.** Switching mode, long-pressing the map, picking a search
+  result / favourite / history entry, adding stops or the locate button only *prepare* (a ring marks the
+  picked spot); nothing is faked until **Start**, and only **Stop** ends it. Switching mode leaves the
+  running spoof untouched (the status chip keeps saying what is haunted); Start in the new mode replaces it
+  without a gap, and a small Stop sits beside Start meanwhile. The stick only steers once the joystick runs.
 - Expanding opens a glass details card above the toolbar (place, coordinates, altitude/accuracy/rate;
   route progress, speed presets, follow roads, loop mode; joystick speed).
-- Locate button (bottom-right): finds the device's **real** location and starts from it — Pin haunts it,
-  Joystick restarts the stick there, Route makes it the first stop. While Haunt is faking, all providers
+- Locate button (bottom-right): finds the device's **real** location and prepares it — Pin / Joystick pick it
+  for Start, Route makes it the first stop. While Haunt is faking, all providers
   return the fake position, so it uses the last real fix seen (≤ 30 min) or asks to stop haunting first.
   Opening Haunt while idle centres the map on the real position.
 - Joystick mode: thumbstick over the map, bottom-left by default; drag the grip on its corner to move it
@@ -299,7 +304,7 @@ so it shares across platforms and is not tied to Material.
   apps" on and the permission granted, the pad is drawn over other apps (`TYPE_APPLICATION_OVERLAY`, hosted
   by `HauntService`) while joystick mode runs and Haunt is in the background; draggable, with an "open Haunt" button.
 
-**Search:** full-screen glass sheet over a blurred map; detects pasted coordinates ("Haunt here"), nearby places, recent.
+**Search:** full-screen glass sheet over a blurred map; detects pasted coordinates ("Pick here"), nearby places, recent.
 **Library:** Favourites (folders) · History · Tracks; import GPX / KML.
 **Settings:** ADB control + activity log · "Connect an AI agent" (`claude mcp add haunt -- haunt mcp`) ·
 map & service endpoints · defaults (theme, update rate, accuracy, units) · joystick (pad size, float over other apps).

@@ -53,6 +53,7 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
 | Floating joystick via `SYSTEM_ALERT_WINDOW` overlay, opt-in | Joystick must work while another app is in front; only asked for when the user turns it on. |
 | Map style generated in code (`HauntMapStyle`) from the theme's map colours, not a hosted style | Real map matches the drawn one and the glass UI, follows light / dark, no style server to host; any OpenMapTiles TileJSON works. |
 | Fonts: Plus Jakarta Sans (UI), JetBrains Mono (data) | Bundled, OFL. |
+| UI starts / stops faking only on explicit Start / Stop; mode switches, pins, stops, places only prepare; a running spoof survives mode switches until Start | User request before release (2026-10-07). The ADB API and CLI are unchanged: agents call them on purpose. |
 
 ## Design references
 - Mockups canvas (user's claude.ai account): https://claude.ai/artifact/BjzUyRME1DM2KfYsU3EkTG — the "Final direction" row is canonical.

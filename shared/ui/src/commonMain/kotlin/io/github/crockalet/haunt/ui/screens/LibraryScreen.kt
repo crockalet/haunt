@@ -102,7 +102,7 @@ fun LibraryScreen(
                                     minHeight = 64.dp,
                                     padding = PaddingValues(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
                                     leading = { FolderBadge(color) },
-                                    trailing = { PlayButton("Haunt ${p.name}") { actions.onHaunt(p) } },
+                                    trailing = { PlayButton("Pick ${p.name}") { actions.onHaunt(p) } },
                                 )
                             }
                         }
@@ -123,7 +123,7 @@ fun LibraryScreen(
                                 leading = { IconBadge(HauntIcons.Clock) },
                                 trailing = {
                                     p.meta?.let { Text(it, style = HauntTheme.type.smallRegular, color = c.muted) }
-                                    PlayButton("Haunt ${p.name}") { actions.onHaunt(p) }
+                                    PlayButton("Pick ${p.name}") { actions.onHaunt(p) }
                                 },
                             )
                         }
@@ -141,7 +141,7 @@ fun LibraryScreen(
                                 minHeight = 64.dp,
                                 padding = PaddingValues(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
                                 leading = { IconBadge(HauntIcons.Route) },
-                                trailing = { PlayButton("Play ${t.name}") { actions.onPlayTrack(t) } },
+                                trailing = { PlayButton("Load ${t.name}") { actions.onPlayTrack(t) } },
                             )
                         }
                     }

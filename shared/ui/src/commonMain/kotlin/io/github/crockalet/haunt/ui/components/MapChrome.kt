@@ -101,6 +101,25 @@ fun StopButton(
     modifier: Modifier = Modifier,
     contentDescription: String = "Stop haunting",
     enabled: Boolean = true,
+) = RoundActionButton(HauntIcons.Stop, 20.dp, onClick, modifier, contentDescription, enabled)
+
+/** Round accent Start button next to the toolbar; takes the Stop button's place while nothing runs. */
+@Composable
+fun StartButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String = "Start haunting",
+    enabled: Boolean = true,
+) = RoundActionButton(HauntIcons.Play, 24.dp, onClick, modifier, contentDescription, enabled)
+
+@Composable
+private fun RoundActionButton(
+    icon: ImageVector,
+    iconSize: Dp,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    contentDescription: String,
+    enabled: Boolean,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val c = HauntTheme.colors
@@ -116,7 +135,7 @@ fun StopButton(
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(HauntIcons.Stop, null, size = 20.dp, tint = if (enabled) c.onAccent else c.muted)
+        Icon(icon, null, size = iconSize, tint = if (enabled) c.onAccent else c.muted)
     }
 }
 

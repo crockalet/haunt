@@ -61,6 +61,7 @@ import io.github.crockalet.haunt.ui.components.ProgressBar
 import io.github.crockalet.haunt.ui.components.SearchPill
 import io.github.crockalet.haunt.ui.components.SegmentedControl
 import io.github.crockalet.haunt.ui.components.Slider
+import io.github.crockalet.haunt.ui.components.StartButton
 import io.github.crockalet.haunt.ui.components.StatTiles
 import io.github.crockalet.haunt.ui.components.StatusChip
 import io.github.crockalet.haunt.ui.components.StopButton
@@ -88,6 +89,8 @@ data class MapActions(
     val onModeSelect: (MapMode) -> Unit = {},
     val onToggleExpanded: () -> Unit = {},
     val onPlayPause: () -> Unit = {},
+    /** Start faking what the selected mode has ready ([MapUiState.startAction]). */
+    val onStart: () -> Unit = {},
     val onStop: () -> Unit = {},
     val onSearch: () -> Unit = {},
     val onLibrary: () -> Unit = {},
@@ -111,7 +114,7 @@ data class MapActions(
 
 /**
  * Map chrome: search pill + status chip on top, joystick pad, details card and the toolbar with
- * the Stop button at the bottom. Drawn over the map by `HauntApp`.
+ * the Start / Stop button at the bottom. Drawn over the map by `HauntApp`.
  */
 @Composable
 fun MapScreen(
@@ -156,7 +159,7 @@ fun MapScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
                     AnimatedVisibility(
-                        state.joystick != null,
+                        state.joystick?.live == true,
                         enter = fadeIn(HauntMotion.snappy()),
                         exit = fadeOut(HauntMotion.snappy()),
                     ) {
@@ -209,13 +212,27 @@ fun MapScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Toolbar(state, actions)
-                StopButton(
-                    onClick = actions.onStop,
-                    enabled = state.active,
-                    contentDescription = if (state.mode == MapMode.Route) "Stop route" else "Stop haunting",
-                )
+                StartStop(state, actions)
             }
         }
+    }
+}
+
+/**
+ * Start when the selected mode has something ready that isn't running, Stop while something runs.
+ * When both apply (e.g. a new pin picked while a route plays) a small glass Stop sits beside Start.
+ */
+@Composable
+private fun StartStop(state: MapUiState, actions: MapActions) {
+    val start = state.startAction
+    val stopLabel = if (state.route?.started == true) "Stop route" else "Stop haunting"
+    if (start != null && state.active) {
+        GlassIconButton(HauntIcons.Stop, stopLabel, actions.onStop, size = 52.dp, iconSize = 18.dp)
+    }
+    if (start != null || !state.active) {
+        StartButton(onClick = actions.onStart, enabled = start != null, contentDescription = start ?: "Start haunting")
+    } else {
+        StopButton(onClick = actions.onStop, contentDescription = stopLabel)
     }
 }
 
@@ -349,14 +366,16 @@ private fun StatusContent(status: StatusUi) {
 
 @Composable
 private fun Toolbar(state: MapUiState, actions: MapActions) {
-    val route = state.mode == MapMode.Route
+    // Pause / resume only while a route plays; starting one is the Start button's job.
+    val started = state.route?.takeIf { it.started }
+    val route = started != null
     GlassToolbar(spacing = if (route) 2.dp else 4.dp) {
         ToolbarButton(HauntIcons.Pin, "Pin mode", state.mode == MapMode.Pin, { actions.onModeSelect(MapMode.Pin) })
-        ToolbarButton(HauntIcons.Route, "Route mode", route, { actions.onModeSelect(MapMode.Route) })
+        ToolbarButton(HauntIcons.Route, "Route mode", state.mode == MapMode.Route, { actions.onModeSelect(MapMode.Route) })
         ToolbarButton(HauntIcons.Joystick, "Joystick mode", state.mode == MapMode.Joystick, { actions.onModeSelect(MapMode.Joystick) })
         VerticalHairline(Modifier.padding(horizontal = if (route) 3.dp else 2.dp))
-        if (route) {
-            val playing = state.route?.playing == true
+        started?.let { r ->
+            val playing = r.playing
             ToolbarButton(
                 icon = if (playing) HauntIcons.Pause else HauntIcons.Play,
                 contentDescription = if (playing) "Pause" else "Resume",

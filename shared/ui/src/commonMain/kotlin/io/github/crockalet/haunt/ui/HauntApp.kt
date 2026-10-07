@@ -224,16 +224,18 @@ internal fun rememberMapActions(state: HauntAppState, data: HauntAppData): MapAc
             onModeSelect = holder::selectMode,
             onToggleExpanded = holder::toggleExpanded,
             onPlayPause = holder::playPause,
+            onStart = holder::start,
             onStop = holder::stop,
             onSearch = { state.navigate(Screen.Search) },
             onLibrary = { state.navigate(Screen.Library) },
             onSettings = { state.navigate(Screen.Settings) },
             onCopyCoordinates = {
-                holder.shown.map.fix?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
+                val ui = holder.shown
+                (ui.pin?.position ?: ui.map.fix)?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
             },
             onSaveFavourite = {
                 val ui = holder.shown
-                ui.map.fix?.let { currentData.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
+                (ui.pin?.position ?: ui.map.fix)?.let { currentData.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
             },
             onSpeedPreset = holder::setSpeedPreset,
             onFollowRoads = holder::setFollowRoads,
@@ -282,7 +284,7 @@ private fun Sheet(
                 onTab = { state.libraryTab = it },
                 onFolder = { state.libraryFolder = it },
                 onHaunt = {
-                    holder.hauntAt(it.position, it.name)
+                    holder.pick(it.position, it.name)
                     state.back()
                 },
                 onPlayTrack = {
@@ -407,7 +409,7 @@ private fun Search(
             onQueryChange = { state.searchQuery = it },
             onBack = { state.back() },
             onHauntHere = {
-                holder.hauntAt(it, labelFor(it))
+                holder.pick(it, labelFor(it))
                 state.back()
             },
             onShowOnMap = {
@@ -416,7 +418,7 @@ private fun Search(
             },
             onSave = { data.onSaveFavourite(Place(labelFor(it) ?: "Saved place", it)) },
             onPlace = {
-                holder.hauntAt(it.position, it.name)
+                holder.pick(it.position, it.name)
                 state.back()
             },
             onPaste = { readClipboard()?.let { state.searchQuery = it } },

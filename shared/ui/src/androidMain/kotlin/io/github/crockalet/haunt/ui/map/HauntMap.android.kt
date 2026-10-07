@@ -132,6 +132,7 @@ actual fun HauntMap(
             include(MapOverlay.AttributionOnly)
             content.route.firstOrNull()?.let { RouteEndpoint(start = true, modifier = Modifier.placedAt(it.toPosition())) }
             if (content.route.size >= 2) RouteEndpoint(start = false, modifier = Modifier.placedAt(content.route.last().toPosition()))
+            content.pending?.let { RouteEndpoint(start = false, modifier = Modifier.placedAt(it.toPosition())) }
             content.fix?.let { fix ->
                 LocationMarker(
                     modifier = Modifier.placedAt(fix.toPosition()),

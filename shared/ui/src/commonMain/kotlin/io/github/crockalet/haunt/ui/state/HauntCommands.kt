@@ -25,10 +25,10 @@ data class RouteOutcome(val points: List<LatLng>, val warning: String? = null)
 class CommandException(message: String, val hint: String? = null, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * The commands that *start* faking a location. The map screen sends them here instead of straight
- * to the controller so the app can run its checks first (mock-app selected, permissions), geocode,
- * route along roads and start its service. Fine-grained, live controls (pause, speed, joystick)
- * still go to the [HauntController].
+ * The commands that *start* faking a location; the map screen only sends them when the user presses
+ * Start. They come here instead of straight to the controller so the app can run its checks first
+ * (mock-app selected, permissions), geocode, route along roads and start its service. Fine-grained,
+ * live controls (pause, speed, stick input) still go to the [HauntController].
  *
  * Implementations throw [CommandException] (or any exception; its message is shown).
  */
@@ -36,6 +36,8 @@ interface HauntCommands {
     suspend fun setLocation(position: LatLng, accuracy: Float?, label: String?)
 
     suspend fun playRoute(request: RouteRequest): RouteOutcome
+
+    suspend fun startJoystick(maxSpeed: Speed, from: LatLng)
 }
 
 /** Calls the controller directly (previews, tests, desktop). Straight lines only. */
@@ -48,6 +50,10 @@ class ControllerCommands(private val controller: HauntController) : HauntCommand
         request.playbackRate?.let(controller::setPlaybackRate)
         controller.playRoute(request.route, request.speed, request.loop)
         return RouteOutcome(request.route.points)
+    }
+
+    override suspend fun startJoystick(maxSpeed: Speed, from: LatLng) {
+        controller.startJoystick(maxSpeed, from)
     }
 }
 

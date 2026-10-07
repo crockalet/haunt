@@ -214,6 +214,21 @@ class AndroidCommandsTest {
     }
 
     @Test
+    fun joystickStartRunsTheSameChecks() = runTest {
+        val (c, h) = commands()
+        env.selected = false
+        val e = assertFailsWith<CommandException> { c.startJoystick(Speed.kmh(12.0), a) }
+        assertTrue(e.hint!!.isNotBlank())
+        assertEquals(HauntState.Idle, h.controller.state.value)
+        assertEquals(0, env.started)
+
+        env.selected = true
+        c.startJoystick(Speed.kmh(12.0), a)
+        assertEquals(a, assertIs<HauntState.Joystick>(h.controller.state.value).fix.position)
+        assertEquals(1, env.started)
+    }
+
+    @Test
     fun rpcErrorsBecomeCommandExceptionsWithHints() = runTest {
         val (c, h) = commands()
         env.selected = false
