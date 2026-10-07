@@ -290,8 +290,9 @@ so it shares across platforms and is not tied to Material.
   (+ pause in Route mode) and an expand arrow, plus a separate round **Stop** button.
 - Expanding opens a glass details card above the toolbar (place, coordinates, altitude/accuracy/rate;
   route progress, speed presets, follow roads, loop mode; joystick speed).
-- Locate button (bottom-right): finds the device's **real** location and starts from it — Pin haunts it,
-  Joystick restarts the stick there, Route makes it the first stop. While Haunt is faking, all providers
+- Locate button (bottom-right): finds the device's **real** location and moves the camera there; it never
+  starts or changes faking. Search results and stops added from search also move the camera to themselves.
+  While Haunt is faking, all providers
   return the fake position, so it uses the last real fix seen (≤ 30 min) or asks to stop haunting first.
   Opening Haunt while idle centres the map on the real position.
 - Joystick mode: thumbstick over the map, bottom-left by default; drag the grip on its corner to move it

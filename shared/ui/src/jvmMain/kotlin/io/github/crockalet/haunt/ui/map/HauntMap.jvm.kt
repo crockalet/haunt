@@ -2,6 +2,7 @@ package io.github.crockalet.haunt.ui.map
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.ui.state.MapContent
 import io.github.crockalet.haunt.ui.state.MapStyle
@@ -13,6 +14,7 @@ actual fun HauntMap(
     style: MapStyle,
     onLongPress: (LatLng) -> Unit,
     modifier: Modifier,
+    bottomInset: Dp,
 ) {
     DrawnMap(content, onLongPress, modifier)
 }

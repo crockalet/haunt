@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.HauntController
 import io.github.crockalet.haunt.ui.screens.LibraryTab
 import io.github.crockalet.haunt.ui.screens.OnboardingUiState
@@ -56,6 +57,9 @@ class HauntAppState(
     var searchQuery by mutableStateOf(initialQuery)
     var libraryTab by mutableStateOf(initialLibraryTab)
     var libraryFolder by mutableStateOf<String?>(null)
+
+    /** How far up from the bottom the map keeps its attribution, clear of the toolbar (measured by the map screen). */
+    var mapBottomInset by mutableStateOf(0.dp)
 
     /** The endpoint being edited on [Screen.Service], with the draft URL / profile. */
     var service by mutableStateOf<ServiceEndpoint?>(null)
