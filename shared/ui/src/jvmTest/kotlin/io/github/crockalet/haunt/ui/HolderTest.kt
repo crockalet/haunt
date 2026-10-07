@@ -493,6 +493,8 @@ private class RoadCommands : HauntCommands {
         return RouteOutcome(request.routed ?: routeAlongRoads(request.route.points))
     }
 
+    override suspend fun startJoystick(maxSpeed: Speed, from: LatLng) = Unit
+
     override val canFollowRoads: Boolean get() = true
 
     override suspend fun routeAlongRoads(stops: List<LatLng>): List<LatLng> {
@@ -546,7 +548,7 @@ class RoadsPreviewTest {
         val holder = holder(commands, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
         advanceUntilIdle()
         assertTrue(commands.played.isEmpty())
-        holder.playPause()
+        holder.start()
         advanceUntilIdle()
         val req = commands.played.single()
         assertEquals(3, req.routed?.size)
