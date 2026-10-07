@@ -1,0 +1,125 @@
+/*
+ * CSS recipes mirroring the Compose components in shared/ui/.../components.
+ * Hand-maintained: when a component's size, colour or shape changes in Kotlin, update it here.
+ */
+.hn-app {
+  font-family: var(--hn-font-sans);
+  font-size: 15px;
+  color: var(--hn-text);
+  background: var(--hn-map);
+  -webkit-font-smoothing: antialiased;
+}
+.hn-muted { color: var(--hn-muted); }
+
+/* GlassSurface: frosted tint over the blurred map, 1px light border, soft outer shadow. */
+.hn-glass {
+  background: var(--hn-glass);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  backdrop-filter: blur(22px) saturate(1.7);
+  border: 1px solid var(--hn-glass-border);
+  box-shadow: 0 10px 30px var(--hn-shadow);
+  border-radius: var(--hn-radius-pill);
+}
+/* GlassVeil: full-screen blur + scrim behind overlay screens (Search, Library, Settings). */
+.hn-veil {
+  position: absolute;
+  inset: 0;
+  background: var(--hn-scrim);
+  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(28px);
+}
+/* Glass inside a veil is a plain tint: the veil already blurred the map. */
+.hn-veil .hn-glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* Press feedback: springy scale (HauntMotion.bouncy). */
+.hn-press { transition: transform var(--hn-spring-bouncy-duration) var(--hn-spring-bouncy); }
+.hn-press:active { transform: scale(0.96); }
+
+/* Buttons. All are pills. */
+.hn-btn-primary, .hn-btn-tonal, .hn-btn-glass {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-radius: var(--hn-radius-pill); cursor: pointer; white-space: nowrap;
+  font-family: var(--hn-font-sans);
+}
+.hn-btn-primary { height: 48px; padding: 0 20px; background: var(--hn-accent); color: var(--hn-on-accent); font-size: 15px; font-weight: 700; }
+.hn-btn-tonal { height: 48px; padding: 0 16px; background: var(--hn-tile); color: var(--hn-text); font-size: 15px; font-weight: 600; }
+.hn-btn-glass { height: 40px; padding: 0 16px; color: var(--hn-text); font-size: 13px; font-weight: 600; }
+.hn-icon-btn {
+  display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 0; border-radius: var(--hn-radius-pill); background: transparent; color: var(--hn-text); cursor: pointer;
+}
+.hn-icon-btn.hn-glass { width: 48px; height: 48px; }
+/* ToolbarButton: 48px round, accent tint when selected. */
+.hn-tool { width: 48px; height: 48px; color: var(--hn-text); }
+.hn-tool[aria-pressed="true"] { background: var(--hn-selected); color: var(--hn-selected-content); }
+/* StopButton: 64px accent circle beside the toolbar. */
+.hn-stop {
+  display: inline-grid; place-items: center; width: 64px; height: 64px; border: 0;
+  border-radius: var(--hn-radius-pill); background: var(--hn-accent); color: var(--hn-on-accent);
+  box-shadow: 0 10px 30px var(--hn-shadow);
+}
+
+/* Chip: 36px tile pill; selected = accent tint. */
+.hn-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
+  border: 0; border-radius: var(--hn-radius-pill); background: var(--hn-tile); color: var(--hn-text);
+  font: 600 13px var(--hn-font-sans); cursor: pointer;
+}
+.hn-chip[aria-pressed="true"] { background: var(--hn-selected); color: var(--hn-selected-content); }
+
+/* SegmentedControl: tile track, glass thumb on the selected segment. */
+.hn-seg { display: inline-flex; padding: 3px; border-radius: var(--hn-radius-pill); background: var(--hn-tile); }
+.hn-seg > button {
+  height: 30px; padding: 0 10px; border: 0; border-radius: var(--hn-radius-pill); background: transparent;
+  color: var(--hn-muted); font: 600 12px var(--hn-font-sans); cursor: pointer;
+}
+.hn-seg > button[aria-selected="true"] { background: var(--hn-glass); color: var(--hn-text); }
+
+/* Tabs: glass track (add .hn-glass), raised thumb on the selected tab. */
+.hn-tabs { display: flex; padding: 4px; }
+.hn-tabs > button {
+  flex: 1; height: 38px; border: 0; border-radius: var(--hn-radius-pill); background: transparent;
+  color: var(--hn-muted); font: 600 14px var(--hn-font-sans); cursor: pointer;
+}
+.hn-tabs > button[aria-selected="true"] { background: var(--hn-tab-on); color: var(--hn-text); }
+
+/* Map chrome. Combine with .hn-glass. */
+.hn-search { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 4px 0 18px; color: var(--hn-muted); }
+.hn-status { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; font: 600 13px var(--hn-font-sans); }
+.hn-toolbar { display: inline-flex; align-items: center; gap: 4px; height: 64px; padding: 0 8px; }
+.hn-card { border-radius: var(--hn-radius-card); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.hn-sheet { border-radius: var(--hn-radius-sheet); }
+
+/* StatTile: key/value in the details card; value is mono. */
+.hn-tiles { display: flex; gap: 8px; }
+.hn-tiles > .hn-tile { flex: 1; }
+.hn-tile { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--hn-radius-tile); background: var(--hn-tile); }
+.hn-tile > :first-child { font: 600 12px var(--hn-font-sans); color: var(--hn-muted); }
+.hn-tile > :last-child { font: 500 15px var(--hn-font-mono); color: var(--hn-text); }
+
+/* ListGroup (add .hn-glass) of ListRows split by hairlines. */
+.hn-section { padding: 0 0 8px 6px; font: 700 13px var(--hn-font-sans); color: var(--hn-muted); }
+.hn-list { border-radius: var(--hn-radius-list); overflow: hidden; }
+.hn-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; box-sizing: border-box; }
+.hn-row + .hn-row { border-top: 1px solid var(--hn-hair); }
+.hn-row-title { font: 600 15px var(--hn-font-sans); color: var(--hn-text); }
+.hn-row-sub { font: 400 13px var(--hn-font-sans); color: var(--hn-muted); }
+/* LeadingBadge: 36px tile circle holding an icon or folder dot. */
+.hn-lead-badge { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: var(--hn-radius-pill); background: var(--hn-tile); color: var(--hn-muted); }
+.hn-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--hn-accent); }
+
+/* Switch: 50x30 track, 24px white thumb. */
+.hn-switch { position: relative; width: 50px; height: 30px; border-radius: var(--hn-radius-pill); background: var(--hn-switch-track); flex: none; }
+.hn-switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); transition: left var(--hn-spring-snappy-duration) var(--hn-spring-snappy);
+}
+.hn-switch[aria-checked="true"] { background: var(--hn-accent); }
+.hn-switch[aria-checked="true"]::after { left: 23px; }
+
+/* ProgressBar / Slider track: 6px, accent fill. Set --value: 0..1. */
+.hn-progress { height: 6px; border-radius: var(--hn-radius-pill); background: var(--hn-track); overflow: hidden; }
+.hn-progress::before { content: ""; display: block; height: 100%; width: calc(var(--value, 0) * 100%); background: var(--hn-accent); border-radius: inherit; }
+
+/* NoticeBanner: glass, small list radius, danger dot for errors. */
+.hn-notice { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px; border-radius: var(--hn-radius-list-small); }

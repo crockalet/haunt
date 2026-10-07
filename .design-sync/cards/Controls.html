@@ -1,0 +1,39 @@
+<!-- @dsCard group="Foundations" -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../../styles.css">
+<style>
+  body{margin:0;padding:20px;background:#fff}
+  .themes{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+  .panel{padding:20px;border-radius:24px;display:flex;flex-direction:column;gap:16px;background:linear-gradient(135deg,var(--hn-park),var(--hn-map) 45%,var(--hn-water))}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+</style></head><body>
+<div class="themes">
+<div class="panel hn-app" data-theme="light"></div>
+<div class="panel hn-app" data-theme="dark"></div>
+</div>
+<template id="t">
+  <div class="row">
+    <button class="hn-btn-primary hn-press">Haunt here</button>
+    <button class="hn-btn-tonal hn-press">Not now</button>
+    <button class="hn-btn-glass hn-glass hn-press">Paste</button>
+  </div>
+  <div class="row">
+    <button class="hn-chip" aria-pressed="true">Walk</button>
+    <button class="hn-chip">Cycle</button>
+    <button class="hn-chip">Drive</button>
+    <div class="hn-seg"><button aria-selected="true">km</button><button>mi</button></div>
+  </div>
+  <div class="hn-glass hn-tabs"><button aria-selected="true">Favourites</button><button>History</button><button>Tracks</button></div>
+  <div class="hn-progress" style="--value:.42"></div>
+  <div>
+    <div class="hn-section">DEFAULTS</div>
+    <div class="hn-glass hn-list">
+      <div class="hn-row"><span class="hn-lead-badge"><span class="hn-dot" style="width:10px;height:10px;background:var(--hn-folder-green)"></span></span><div style="flex:1"><div class="hn-row-title">Follow roads</div><div class="hn-row-sub">Snap routes to streets</div></div><span class="hn-switch" role="switch" aria-checked="true"></span></div>
+      <div class="hn-row"><span class="hn-lead-badge"><span class="hn-dot" style="width:10px;height:10px;background:var(--hn-folder-orange)"></span></span><div style="flex:1"><div class="hn-row-title">Float over other apps</div><div class="hn-row-sub">Joystick stays on screen</div></div><span class="hn-switch" role="switch" aria-checked="false"></span></div>
+    </div>
+  </div>
+  <div class="hn-glass hn-notice"><span class="hn-dot" style="background:var(--hn-danger)"></span><div style="flex:1"><div class="hn-label">Routing server unreachable</div><div class="hn-caption hn-muted">Using straight lines between stops.</div></div><span class="hn-muted">✕</span></div>
+</template>
+<script>for(const p of document.querySelectorAll('.panel'))p.innerHTML=document.getElementById('t').innerHTML</script>
+</body></html>

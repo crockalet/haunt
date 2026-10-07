@@ -1,0 +1,25 @@
+<!-- @dsCard group="Foundations" -->
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../../styles.css">
+<style>
+  body{margin:0;padding:20px;background:#fff;font-family:var(--hn-font-sans)}
+  .themes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .panel{padding:18px;border-radius:20px;background:var(--hn-map);color:var(--hn-text)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;margin-top:12px}
+  .sw{display:flex;flex-direction:column;gap:4px}
+  .chip{height:44px;border-radius:12px;border:1px solid var(--hn-hair)}
+  .sw span{font:500 11px var(--hn-font-mono);color:var(--hn-muted)}
+</style></head><body>
+<div class="themes">
+  <div class="panel" data-theme="light"></div>
+  <div class="panel" data-theme="dark"></div>
+</div>
+<script>
+const names=['accent','on-accent','selected','selected-content','text','muted','glass','glass-border','tile','hair','divider','track','scrim','map','park','water','major-road','casing','map-label','danger','folder-blue','folder-green','folder-orange'];
+for(const p of document.querySelectorAll('.panel')){
+  p.innerHTML=`<div class="hn-title-small">${p.dataset.theme==='dark'?'Dark':'Light'}</div><div class="grid">`+
+    names.map(n=>`<div class="sw"><div class="chip" style="background:var(--hn-${n})"></div><span>${n}</span></div>`).join('')+'</div>';
+}
+</script>
+</body></html>
