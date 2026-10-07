@@ -29,7 +29,7 @@ place search by [Photon](https://photon.komoot.io) (komoot). In the app: Setting
 
 ## Contact
 
-[contact]
+Open an issue on [GitHub](https://github.com/crockalet/haunt/issues).
 
 ## License
 

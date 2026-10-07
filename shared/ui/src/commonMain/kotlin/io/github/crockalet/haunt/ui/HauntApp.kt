@@ -342,7 +342,7 @@ private fun Sheet(
             ),
         )
         Screen.DataLicences -> DataLicencesScreen(
-            state = DataLicencesUiState(data.openSource, data.appVersion, data.loadNotice),
+            state = DataLicencesUiState(data.openSource, data.appVersion, data.contactEmail, data.loadNotice),
             actions = DataLicencesActions(
                 onBack = { state.back() },
                 onOpenUrl = openUrl,

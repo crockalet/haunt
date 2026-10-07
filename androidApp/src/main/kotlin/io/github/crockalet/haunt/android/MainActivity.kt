@@ -243,6 +243,7 @@ class MainActivity : ComponentActivity() {
             openSource = openSource,
             loadNotice = { path -> withContext(Dispatchers.IO) { OpenSourceLicences.readNotice(this@MainActivity, path) } },
             appVersion = appVersion,
+            contactEmail = getString(R.string.contact_email).ifBlank { null },
         )
 
         HauntApp(

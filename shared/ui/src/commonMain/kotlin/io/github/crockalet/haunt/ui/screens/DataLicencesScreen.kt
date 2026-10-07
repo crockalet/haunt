@@ -39,6 +39,8 @@ import io.github.crockalet.haunt.ui.theme.HauntTheme
 data class DataLicencesUiState(
     val openSource: OpenSourceInfo = OpenSourceInfo(),
     val appVersion: String? = null,
+    /** Operator contact (FOSSGIS's routing terms ask apps to publish one); no Contact row when null. */
+    val contactEmail: String? = null,
     /** Reads a bundled [OssNotice] by its path. */
     val loadNotice: suspend (path: String) -> String = { "" },
 )
@@ -68,14 +70,14 @@ fun DataLicencesScreen(state: DataLicencesUiState, actions: DataLicencesActions,
         CreditGroup(
             CreditSection(
                 "Haunt",
-                listOf(
+                listOfNotNull(
                     Credit(
                         state.appVersion?.let { "Haunt $it" } ?: "Haunt",
                         "Free software · GNU GPL v3 or later",
                         DataCredits.GPL_URL,
                     ),
                     Credit("Source code", DataCredits.SOURCE_URL.removePrefix("https://"), DataCredits.SOURCE_URL),
-                    Credit("Contact", DataCredits.CONTACT_EMAIL, "mailto:${DataCredits.CONTACT_EMAIL}"),
+                    state.contactEmail?.let { Credit("Contact", it, "mailto:$it") },
                 ),
             ),
             actions.onOpenUrl,

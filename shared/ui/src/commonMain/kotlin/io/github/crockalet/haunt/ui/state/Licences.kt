@@ -78,9 +78,6 @@ object DataCredits {
     const val SOURCE_URL = "https://github.com/crockalet/haunt"
     const val GPL_URL = "https://www.gnu.org/licenses/gpl-3.0.html"
 
-    /** Operator contact; FOSSGIS's routing terms ask apps to publish one. */
-    const val CONTACT_EMAIL = "[contact]"
-
     val Map = CreditSection(
         "Map data",
         listOf(

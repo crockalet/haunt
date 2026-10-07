@@ -54,6 +54,8 @@ data class HauntAppData(
     val loadNotice: suspend (path: String) -> String = { "" },
     /** Shown as "Haunt <version>" on the Data & licences screen. */
     val appVersion: String? = null,
+    /** Operator contact for Data & licences; set at build time from `HAUNT_CONTACT_EMAIL`. */
+    val contactEmail: String? = null,
 ) {
     companion object {
         val DefaultServices = listOf(

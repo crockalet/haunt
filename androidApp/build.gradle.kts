@@ -20,6 +20,8 @@ android {
         // CI passes -Phaunt.versionCode=<run number> so each nightly installs over the previous one.
         versionCode = providers.gradleProperty("haunt.versionCode").orNull?.toInt() ?: 1
         versionName = "0.1.0" + providers.gradleProperty("haunt.versionSuffix").getOrElse("")
+        // Kept out of the repo; Data & licences hides the Contact row when it's empty.
+        resValue("string", "contact_email", providers.environmentVariable("HAUNT_CONTACT_EMAIL").getOrElse(""))
     }
 
     signingConfigs {
@@ -49,7 +51,10 @@ android {
         create("play") { dimension = "distribution" }
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        resValues = true
+    }
 
     lint {
         // play-services-base drags in fragment 1.1.0, but MainActivity is a ComponentActivity, not a FragmentActivity.
