@@ -28,6 +28,16 @@ android {
         }
     }
 
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Shared key so nightlies update in place; real release signing comes later (M5).
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     flavorDimensions += "distribution"
     productFlavors {
         create("foss") { dimension = "distribution" }
@@ -35,6 +45,11 @@ android {
     }
 
     buildFeatures { compose = true }
+
+    lint {
+        // play-services-base drags in fragment 1.1.0, but MainActivity is a ComponentActivity, not a FragmentActivity.
+        disable += "InvalidFragmentVersionForActivityResult"
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -51,6 +66,7 @@ dependencies {
     implementation(project(":shared:protocol"))
     implementation(project(":shared:ui"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.compose.foundation) // floating joystick window
     implementation(libs.kotlinx.coroutines.android)
     "playImplementation"(libs.play.services.location)

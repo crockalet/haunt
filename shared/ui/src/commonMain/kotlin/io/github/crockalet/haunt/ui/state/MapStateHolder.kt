@@ -3,11 +3,12 @@ package io.github.crockalet.haunt.ui.state
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import io.github.crockalet.haunt.core.HauntController
 import io.github.crockalet.haunt.core.HauntState
 import io.github.crockalet.haunt.core.LatLng
@@ -19,12 +20,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * State holder (presenter) for the map screen. Owns UI-only state ([LocalUiState]) and turns user
  * intents into [HauntController] calls. Engine state is the source of truth for what is being
  * faked; this class only remembers what the engine doesn't (mode, expanded card, presets, draft
- * route…). Feed it engine states with [onEngineState] (done by `rememberHauntAppState`) and read [uiState].
+ * route…). Feed it engine states with [onEngineState] (done by `rememberHauntAppState`) and read [shown]
+ * from composition; [uiState] builds the same from the controller's current state.
  *
  * Starting to fake a location (pin, place, route) goes through [commands], which may suspend and
  * fail (permissions, mock app not selected…); failures become a [notice]. Live tweaks (pause,
@@ -56,11 +59,45 @@ class MapStateHolder(
         notice = null
     }
 
+    /** Engine state as of the last [onEngineState]; written together with [local] so a tick recomposes once. */
+    private var engine by mutableStateOf(controller.state.value)
+
+    /** Position of the newest fix seen; committed to [LocalUiState.lastPosition] when the engine goes idle. */
+    private var lastFix: LatLng? = null
+
+    private var measured: MeasuredLine? = null
+
+    private fun measure(points: List<LatLng>): MeasuredLine =
+        measured?.takeIf { it.points == points } ?: MeasuredLine(points).also { measured = it }
+
+    private val shownState = derivedStateOf(structuralEqualityPolicy()) { buildMapUiState(engine, local, defaults, ::measure) }
+    private val mapContentState = derivedStateOf(structuralEqualityPolicy()) { shownState.value.map }
+    private val expandedState = derivedStateOf(structuralEqualityPolicy()) { local.expanded }
+
     /** Current UI state; reads engine state from [HauntController.state]. */
     val uiState: MapUiState
-        get() = buildMapUiState(controller.state.value, local, defaults)
+        get() = buildMapUiState(controller.state.value, local, defaults, ::measure)
 
-    /** Track engine transitions that matter to the UI (active-since timer, joystick trail). */
+    /** What the map screen shows (snapshot state): the last engine state passed to [onEngineState], plus [local]. */
+    val shown: MapUiState
+        get() = shownState.value
+
+    /** Just the map layer's part of [shown]; only changes when what the map draws does. */
+    val mapContent: MapContent
+        get() = mapContentState.value
+
+    /** The details card is open. */
+    val expanded: Boolean
+        get() = expandedState.value
+
+    /** Where the ghost is, or was when it was last seen (snapshot state). */
+    val lastPosition: LatLng?
+        get() = engine.currentFix?.position ?: local.lastPosition
+
+    /**
+     * Track engine transitions that matter to the UI (active-since timer, joystick trail, last
+     * position). A plain fix update while holding or on a route leaves [local] untouched.
+     */
     fun onEngineState(state: HauntState) {
         val fix = state.currentFix
         var l = local
@@ -70,8 +107,11 @@ class MapStateHolder(
             else -> l
         }
         if (state !is HauntState.Moving && l.playingRoute != null) l = l.copy(playingRoute = null)
-        if (fix != null) {
-            l = l.copy(lastPosition = fix.position)
+        if (fix == null) {
+            lastFix?.let { if (l.lastPosition != it) l = l.copy(lastPosition = it) }
+        } else {
+            lastFix = fix.position
+            if (l.lastPosition == null) l = l.copy(lastPosition = fix.position)
             if (state is HauntState.Joystick) {
                 val last = l.trail.lastOrNull()
                 if (last == null || Geo.distance(last, fix.position) > 3.0) l = l.copy(trail = (l.trail + fix.position).takeLast(200))
@@ -79,6 +119,7 @@ class MapStateHolder(
                 l = l.copy(trail = emptyList())
             }
         }
+        engine = state
         if (l != local) local = l
     }
 
@@ -92,8 +133,10 @@ class MapStateHolder(
             controller.setLocation(engine.fix.position, label = "Joystick stop")
         }
         local = local.copy(mode = mode)
-        if (mode == MapMode.Joystick) {
-            controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = engine.currentFix?.position ?: local.lastPosition)
+        val start = engine.currentFix?.position ?: local.lastPosition
+        // With nowhere to start from, wait for a long-press or locate to place the stick.
+        if (mode == MapMode.Joystick && start != null) {
+            controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = start)
         }
     }
 
@@ -236,10 +279,13 @@ class MapStateHolder(
         if (controller.state.value is HauntState.Moving) controller.setSpeed(routeSpeed())
     }
 
-    /** Value of the Custom speed editor; applied live when Custom is the selected preset. */
+    /** Value of the Custom speed editor, in whole km/h; applied live when Custom is the selected preset. */
     fun setCustomSpeed(kmh: Float) {
-        val clamped = kmh.coerceIn(CustomSpeedRangeKmh.start, CustomSpeedRangeKmh.endInclusive)
-        local = local.copy(customSpeed = Speed.kmh(clamped.toDouble()))
+        val clamped = kmh.coerceIn(CustomSpeedRangeKmh.start, CustomSpeedRangeKmh.endInclusive).roundToInt()
+        val speed = Speed.kmh(clamped.toDouble())
+        // A drag reports every pixel; only whole km/h (what the label shows) are worth a recomposition.
+        if (speed == local.customSpeed) return
+        local = local.copy(customSpeed = speed)
         if (local.speedPreset == SpeedPreset.Custom && controller.state.value is HauntState.Moving) {
             controller.setSpeed(routeSpeed())
         }
@@ -276,17 +322,22 @@ class MapStateHolder(
 
     // --- Joystick ----------------------------------------------------------------------------
 
+    /** Live stick input. Goes straight to the engine: the pad draws its own knob, so [local] isn't touched. */
     fun joystickInput(bearingDeg: Double, magnitude: Double) {
-        local = local.copy(joystickBearing = bearingDeg, joystickMagnitude = magnitude)
-        if (controller.state.value !is HauntState.Joystick) {
-            controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = local.lastPosition)
+        val s = controller.state.value
+        if (s !is HauntState.Joystick) {
+            val start = s.currentFix?.position ?: lastPosition ?: return
+            controller.startJoystick(Speed.kmh(local.joystickMaxKmh.toDouble()), from = start)
         }
         controller.joystickInput(bearingDeg, magnitude)
     }
 
+    /** Max speed slider, in whole km/h. */
     fun setJoystickMaxSpeed(kmh: Float) {
-        local = local.copy(joystickMaxKmh = kmh)
-        if (controller.state.value is HauntState.Joystick) controller.setSpeed(Speed.kmh(kmh.toDouble()))
+        val rounded = kmh.roundToInt().toFloat()
+        if (rounded == local.joystickMaxKmh) return
+        local = local.copy(joystickMaxKmh = rounded)
+        if (controller.state.value is HauntState.Joystick) controller.setSpeed(Speed.kmh(rounded.toDouble()))
     }
 
     // --- Stop --------------------------------------------------------------------------------
@@ -333,15 +384,11 @@ fun rememberMapStateHolder(
     defaults: HauntDefaults = HauntDefaults(),
 ): MapStateHolder {
     val holder = remember(controller) { MapStateHolder(controller, initial, defaults) }
-    val engine by controller.state.collectAsState()
-    LaunchedEffect(holder, engine) { holder.onEngineState(engine) }
+    // Collected outside composition so a tick doesn't recompose the caller.
+    LaunchedEffect(holder) { controller.state.collect(holder::onEngineState) }
     return holder
 }
 
-
-/** Collects engine state and returns the current [MapUiState]. */
+/** The current [MapUiState] ([MapStateHolder.shown]); engine state arrives through [MapStateHolder.onEngineState]. */
 @Composable
-fun MapStateHolder.collectUiState(): MapUiState {
-    val engine by controller.state.collectAsState()
-    return buildMapUiState(engine, local, defaults)
-}
+fun MapStateHolder.collectUiState(): MapUiState = shown

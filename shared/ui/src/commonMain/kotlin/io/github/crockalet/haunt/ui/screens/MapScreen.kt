@@ -132,6 +132,7 @@ fun MapScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Text("Haunt", Modifier.fillMaxWidth().padding(horizontal = 8.dp), style = HauntTheme.type.title)
             SearchPill(
                 placeholder = state.searchPlaceholder,
                 leadingIcon = if (state.mode == MapMode.Route) HauntIcons.Plus else HauntIcons.Search,
@@ -159,8 +160,9 @@ fun MapScreen(
                         enter = fadeIn(HauntMotion.snappy()),
                         exit = fadeOut(HauntMotion.snappy()),
                     ) {
-                        // Keep showing the last pad while it animates out.
-                        val last = remember { mutableStateOf(state.joystick) }
+                        // Keep showing the last pad while it animates out. A plain holder: writing state here
+                        // would recompose this twice per joystick update.
+                        val last = remember { LastJoystick() }
                         state.joystick?.let { last.value = it }
                         last.value?.let { j ->
                             Column {
@@ -220,17 +222,26 @@ fun MapScreen(
 /** Round glass button: centre on / start from the device's real location. Spins while locating. */
 @Composable
 private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val spin = rememberInfiniteTransition(label = "locate")
-    val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "spin")
+    // Spin the icon only; rotating the glass would re-blur it every frame.
+    val spin = if (locating) {
+        val angle = rememberInfiniteTransition(label = "locate")
+            .animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "spin")
+        Modifier.graphicsLayer { rotationZ = angle.value }
+    } else {
+        Modifier
+    }
     GlassIconButton(
         icon = if (locating) HauntIcons.Spinner else HauntIcons.Locate,
         contentDescription = if (locating) "Finding your location" else "Start from my location",
         onClick = onClick,
         modifier = modifier,
         size = 52.dp,
-        // Spin the icon only; rotating the glass would re-blur it every frame.
-        iconModifier = Modifier.graphicsLayer { rotationZ = if (locating) angle else 0f },
+        iconModifier = spin,
     )
+}
+
+private class LastJoystick {
+    var value: JoystickDetails? = null
 }
 
 /** Layout bounds kept outside snapshot state: written on every layout pass, read only in gestures. */
@@ -253,7 +264,6 @@ private fun MovableJoystick(j: JoystickDetails, areaBounds: Bounds, actions: Map
     val stored = Offset(j.offsetX, j.offsetY)
     var live by remember { mutableStateOf<Offset?>(null) }
     val baseBounds = remember { Bounds() }
-    val offset = live ?: stored
     val padSize = j.size.dp.dp
 
     fun clamp(o: Offset): Offset {
@@ -273,7 +283,10 @@ private fun MovableJoystick(j: JoystickDetails, areaBounds: Bounds, actions: Map
         Modifier
             .padding(start = 14.dp)
             .onGloballyPositioned { baseBounds.rect = it.boundsInRoot() }
-            .offset { IntOffset(offset.x.dp.roundToPx(), offset.y.dp.roundToPx()) },
+            .offset {
+                val o = live ?: stored
+                IntOffset(o.x.dp.roundToPx(), o.y.dp.roundToPx())
+            },
     ) {
         JoystickPad(
             bearingDeg = j.bearingDeg,

@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,7 +70,8 @@ object JoystickMath {
  * bearing (0 = north) and magnitude (0..1). On release the knob springs back and [onInput] gets
  * magnitude 0.
  *
- * When not dragging, the knob shows [bearingDeg]/[magnitude] (hoisted state).
+ * When not dragging, the knob shows [bearingDeg]/[magnitude] (hoisted state). While dragging the knob
+ * position stays inside the pad: the caller needn't feed [onInput] back for the knob to follow.
  */
 @Composable
 fun JoystickPad(
@@ -82,19 +86,21 @@ fun JoystickPad(
     val knobSize = padSize * 0.4f
     val maxTravel = with(density) { ((padSize - knobSize) / 2).toPx() }
     val input by rememberUpdatedState(onInput)
-    val lastBearing by rememberUpdatedState(bearingDeg)
-    var drag by remember { mutableStateOf<Offset?>(null) }
+    // Bearing of the last input sent; the release keeps it, with magnitude 0.
+    var lastBearing by remember { mutableDoubleStateOf(bearingDeg) }
     // Follows the finger exactly while dragging; springs back to the hoisted position on release.
+    // Only read in the offset lambda, so a drag re-places the knob without recomposing.
+    var drag by remember { mutableStateOf<Offset?>(null) }
+    val dragging by remember { derivedStateOf(structuralEqualityPolicy()) { drag != null } }
     val rest = JoystickMath.toOffset(bearingDeg, magnitude, maxTravel)
     val spring = remember { Animatable(rest, Offset.VectorConverter) }
     var released by remember { mutableStateOf<Offset?>(null) }
-    LaunchedEffect(drag == null, rest) {
-        if (drag != null) return@LaunchedEffect
+    LaunchedEffect(dragging, rest) {
+        if (dragging) return@LaunchedEffect
         released?.let { spring.snapTo(it) }
         released = null
         spring.animateTo(rest, HauntMotion.bouncy())
     }
-    val knob = drag ?: spring.value
 
     GlassSurface(
         modifier
@@ -108,6 +114,7 @@ fun JoystickPad(
                     if (len > maxTravel) v = v * (maxTravel / len)
                     drag = v
                     val (b, m) = JoystickMath.toPolar(v.x, v.y, maxTravel)
+                    lastBearing = b
                     input(b, m)
                 }
                 detectDragGestures(
@@ -135,7 +142,10 @@ fun JoystickPad(
         Box(
             Modifier
                 .align(Alignment.Center)
-                .offset { IntOffset(knob.x.roundToInt(), knob.y.roundToInt()) }
+                .offset {
+                    val knob = drag ?: spring.value
+                    IntOffset(knob.x.roundToInt(), knob.y.roundToInt())
+                }
                 .size(knobSize)
                 .dropShadow(HauntShapes.pill, Shadow(radius = 14.dp, color = Color.Black.copy(alpha = 0.3f), offset = DpOffset(0.dp, 4.dp)))
                 .clip(HauntShapes.pill)

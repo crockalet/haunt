@@ -3,7 +3,6 @@ package io.github.crockalet.haunt.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -130,7 +129,7 @@ fun rememberHauntAppState(
             commands = commands, scope = scope,
         )
     }
-    val engine by controller.state.collectAsState()
-    LaunchedEffect(state, engine) { state.map.onEngineState(engine) }
+    // Collected outside composition: an engine tick must not recompose the caller of this function.
+    LaunchedEffect(state) { controller.state.collect(state.map::onEngineState) }
     return state
 }

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -32,7 +31,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.shadow.Shadow
@@ -47,6 +49,7 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntShapes
@@ -65,12 +68,13 @@ fun Chip(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val c = HauntTheme.colors
+    val fill = animateColorAsState(if (selected) c.selected else c.tile, HauntMotion.snappy(), label = "chip")
     Row(
         modifier
             .pressScale(interaction)
             .height(height)
             .clip(HauntShapes.pill)
-            .background(animateColorAsState(if (selected) c.selected else c.tile, HauntMotion.snappy(), label = "chip").value)
+            .drawBehind { drawRect(fill.value) }
             .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .semantics { this.selected = selected }
             .padding(horizontal = 14.dp),
@@ -175,7 +179,7 @@ fun Switch(
     contentDescription: String? = null,
 ) {
     val c = HauntTheme.colors
-    val x by animateDpAsState(if (checked) 23.dp else 3.dp)
+    val x = animateDpAsState(if (checked) 23.dp else 3.dp)
     Box(
         modifier
             .size(50.dp, 30.dp)
@@ -186,7 +190,7 @@ fun Switch(
     ) {
         Box(
             Modifier
-                .offset(x = x, y = 3.dp)
+                .offset { IntOffset(x.value.roundToPx(), 3.dp.roundToPx()) }
                 .size(24.dp)
                 .dropShadow(HauntShapes.pill, Shadow(radius = 3.dp, color = Color.Black.copy(alpha = 0.3f), offset = DpOffset(0.dp, 1.dp)))
                 .clip(HauntShapes.pill)
@@ -233,7 +237,7 @@ fun Slider(
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = (trackWidth - thumb) * fraction)
+                    .offset { IntOffset(((trackWidth - thumb) * fraction).roundToPx(), 0) }
                     .size(thumb)
                     .dropShadow(HauntShapes.pill, Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.25f), offset = DpOffset(0.dp, 1.dp)))
                     .clip(HauntShapes.pill)
@@ -251,16 +255,19 @@ fun ProgressBar(
     height: Dp = 6.dp,
 ) {
     val c = HauntTheme.colors
-    val p by animateFloatAsState(progress.coerceIn(0f, 1f))
+    val target = progress.coerceIn(0f, 1f)
+    val p = animateFloatAsState(target)
     Box(
         modifier
             .height(height)
             .clip(HauntShapes.pill)
             .background(c.track)
-            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(p, 0f..1f) },
-    ) {
-        Box(Modifier.fillMaxHeight().fillMaxWidth(p).clip(HauntShapes.pill).background(c.accent))
-    }
+            .drawBehind {
+                val fill = Size(size.width * p.value, size.height)
+                drawRoundRect(c.accent, size = fill, cornerRadius = CornerRadius(fill.minDimension / 2))
+            }
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f) },
+    )
 }
 
 /** Key/value tile in the details card (`.tile`). */

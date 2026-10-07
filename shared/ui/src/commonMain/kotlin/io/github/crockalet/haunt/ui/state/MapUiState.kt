@@ -115,10 +115,15 @@ data class LocalUiState(
     val loop: LoopMode = LoopMode.Once,
     val rate: Int = 1,
     val joystickMaxKmh: Float = 12f,
+    /** Where the pad's knob rests (previews). Live stick input goes straight to the engine, not here. */
     val joystickBearing: Double = 0.0,
     val joystickMagnitude: Double = 0.0,
     val activeSinceMillis: Long? = null,
     val trail: List<LatLng> = emptyList(),
+    /**
+     * Where the ghost was last: the first fix seen, the locate button's result, and the last fix
+     * when the engine goes idle. Not updated on every fix; while active the engine's fix wins.
+     */
     val lastPosition: LatLng? = null,
     /** Camera target set by "Show on map"; cleared when something is haunted. */
     val cameraOverride: LatLng? = null,
@@ -133,6 +138,14 @@ fun buildMapUiState(
     engine: HauntState,
     local: LocalUiState,
     defaults: HauntDefaults = HauntDefaults(),
+): MapUiState = buildMapUiState(engine, local, defaults, ::MeasuredLine)
+
+/** [buildMapUiState] with [measure] supplying (typically cached) route measurements. */
+internal fun buildMapUiState(
+    engine: HauntState,
+    local: LocalUiState,
+    defaults: HauntDefaults,
+    measure: (List<LatLng>) -> MeasuredLine,
 ): MapUiState {
     val fix = engine.currentFix
     val active = engine !is HauntState.Idle
@@ -165,7 +178,7 @@ fun buildMapUiState(
 
     val route = if (local.mode == MapMode.Route) {
         val moving = engine as? HauntState.Moving
-        val total = moving?.progress?.totalMeters ?: Geo.length(local.draftRoute)
+        val total = moving?.progress?.totalMeters ?: measure(local.draftRoute).length
         val traveled = moving?.progress?.traveledMeters ?: 0.0
         val speed = moving?.speed ?: local.presetSpeed()
         RouteDetails(
@@ -226,7 +239,7 @@ fun buildMapUiState(
         else -> local.draftRoute
     }
     val traveledPoints = if (moving != null && routePoints.size >= 2) {
-        Geo.split(routePoints, moving.progress.traveledMeters).first
+        measure(routePoints).traveled(moving.progress.traveledMeters)
     } else emptyList()
 
     return MapUiState(
@@ -251,4 +264,29 @@ fun buildMapUiState(
             follow = local.cameraOverride != null || engine is HauntState.Moving || engine is HauntState.Joystick,
         ),
     )
+}
+
+/** A polyline with its running lengths, so cutting it on every engine tick doesn't re-measure the whole route. */
+internal class MeasuredLine(val points: List<LatLng>) {
+    private val cumulative = DoubleArray(points.size).also { c ->
+        for (i in 1 until points.size) c[i] = c[i - 1] + Geo.distance(points[i - 1], points[i])
+    }
+
+    val length: Double get() = if (points.isEmpty()) 0.0 else cumulative[points.lastIndex]
+
+    /** The part up to [meters] along the line, ending at the cut point: `Geo.split(points, meters).first`. */
+    fun traveled(meters: Double): List<LatLng> {
+        if (points.size < 2) return points
+        val m = meters.coerceAtLeast(0.0)
+        if (m > length) return points
+        var lo = 0
+        var hi = points.lastIndex - 1
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (cumulative[mid + 1] >= m) hi = mid else lo = mid + 1
+        }
+        val seg = cumulative[lo + 1] - cumulative[lo]
+        val cut = if (seg == 0.0) points[lo] else Geo.interpolate(points[lo], points[lo + 1], (m - cumulative[lo]) / seg)
+        return points.subList(0, lo + 1) + cut
+    }
 }

@@ -18,6 +18,8 @@ import io.github.crockalet.haunt.ui.state.RouteOutcome
 import io.github.crockalet.haunt.ui.state.RouteRequest
 import io.github.crockalet.haunt.ui.state.SpeedPreset
 import io.github.crockalet.haunt.ui.state.Track
+import io.github.crockalet.haunt.ui.state.Geo
+import io.github.crockalet.haunt.ui.state.MeasuredLine
 import io.github.crockalet.haunt.ui.state.buildMapUiState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /** Records every command; its state is set by the test. */
@@ -221,6 +224,84 @@ class HolderTest {
     }
 
     @Test
+    fun joystickWithNoPositionWaitsInsteadOfStarting() {
+        val c = RecordingController()
+        val holder = MapStateHolder(c, LocalUiState())
+        holder.selectMode(MapMode.Joystick)
+        holder.joystickInput(90.0, 1.0)
+        assertEquals(MapMode.Joystick, holder.local.mode)
+        assertEquals(emptyList(), c.calls)
+    }
+
+    @Test
+    fun joystickInputGoesToTheEngineWithoutTouchingLocal() {
+        val c = RecordingController(HauntState.Joystick(fix, Speed.kmh(12.0), 0.0, 0.0))
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick))
+        val before = holder.local
+        holder.joystickInput(90.0, 0.5)
+        holder.joystickInput(91.0, 0.6)
+        holder.joystickInput(91.0, 0.0)
+        assertSame(before, holder.local)
+        assertEquals(List(3) { "joystickInput" }, c.calls)
+    }
+
+    @Test
+    fun joystickInputStartsFromTheCurrentFix() {
+        val c = RecordingController(HauntState.Holding(Fix(b, timeMillis = 0), "pin"))
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick))
+        holder.joystickInput(90.0, 1.0)
+        assertEquals(listOf("startJoystick", "joystickInput"), c.calls)
+    }
+
+    @Test
+    fun slidersOnlyCommitWholeKmh() {
+        val c = RecordingController(HauntState.Joystick(fix, Speed.kmh(12.0), 0.0, 0.0))
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick))
+        holder.setJoystickMaxSpeed(20.2f)
+        val after = holder.local
+        holder.setJoystickMaxSpeed(19.8f)
+        holder.setJoystickMaxSpeed(20.4f)
+        assertSame(after, holder.local)
+        assertEquals(20f, holder.local.joystickMaxKmh)
+        assertEquals(listOf("setSpeed 5.56"), c.calls)
+
+        holder.setCustomSpeed(36.3f)
+        val custom = holder.local
+        holder.setCustomSpeed(35.7f)
+        assertSame(custom, holder.local)
+        assertEquals(36.0, custom.customSpeed.kmh, 1e-9)
+    }
+
+    @Test
+    fun engineTicksLeaveLocalAloneAndIdleKeepsTheLastFix() {
+        val c = RecordingController()
+        val holder = MapStateHolder(c)
+        holder.onEngineState(HauntState.Holding(Fix(a, timeMillis = 0), "pin"))
+        assertEquals(a, holder.local.lastPosition)
+        val local = holder.local
+        holder.onEngineState(HauntState.Holding(Fix(b, timeMillis = 1_000), "pin"))
+        holder.onEngineState(HauntState.Holding(Fix(b, timeMillis = 2_000), "pin"))
+        assertSame(local, holder.local)
+        assertEquals(b, holder.shown.map.fix)
+        assertEquals(b, holder.lastPosition)
+        holder.onEngineState(HauntState.Idle)
+        assertEquals(b, holder.local.lastPosition)
+        assertEquals(b, holder.shown.map.fix)
+        assertEquals("Last location", assertNotNull(holder.shown.pin).title)
+    }
+
+    @Test
+    fun shownFollowsOnEngineStateNotTheFlow() {
+        val c = RecordingController()
+        val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Route, draftRoute = listOf(a, b)))
+        c.state.value = moving()
+        assertEquals(false, holder.shown.active)
+        holder.onEngineState(c.state.value)
+        assertEquals(true, holder.shown.active)
+        assertEquals(holder.uiState, holder.shown)
+    }
+
+    @Test
     fun locateInJoystickModeRestartsTheStickThere() {
         val c = RecordingController()
         val holder = MapStateHolder(c, LocalUiState(mode = MapMode.Joystick))
@@ -256,5 +337,31 @@ class HolderTest {
         assertEquals(Notice("Haunt is faking your location right now", "Stop haunting first."), holder.notice)
         assertEquals(false, holder.local.locating)
         assertTrue(buildMapUiState(HauntState.Idle, holder.local).locating.not())
+    }
+}
+
+class MeasuredLineTest {
+    private val line = listOf(LatLng(0.0, 0.0), LatLng(0.0, 0.01), LatLng(0.0, 0.01), LatLng(0.01, 0.01), LatLng(0.01, 0.02))
+
+    @Test
+    fun cutsLikeGeoSplit() {
+        val measured = MeasuredLine(line)
+        assertEquals(Geo.length(line), measured.length, 1e-6)
+        val total = Geo.length(line)
+        for (m in listOf(-5.0, 0.0, 1.0, 500.0, 1111.9, 1112.0, 1500.0, total / 2, total - 1, total, total + 10)) {
+            val expected = Geo.split(line, m).first
+            val actual = measured.traveled(m)
+            assertEquals(expected.size, actual.size, "at $m")
+            expected.zip(actual).forEach { (e, x) ->
+                assertEquals(e.lat, x.lat, 1e-9, "at $m")
+                assertEquals(e.lng, x.lng, 1e-9, "at $m")
+            }
+        }
+    }
+
+    @Test
+    fun shortLines() {
+        assertEquals(0.0, MeasuredLine(emptyList()).length)
+        assertEquals(listOf(LatLng(1.0, 1.0)), MeasuredLine(listOf(LatLng(1.0, 1.0))).traveled(10.0))
     }
 }

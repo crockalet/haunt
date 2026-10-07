@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shape
@@ -133,12 +134,13 @@ fun ToolbarButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val c = HauntTheme.colors
+    val fill = animateColorAsState(if (selected) c.selected else c.selected.copy(alpha = 0f), HauntMotion.snappy(), label = "toolbar")
     Box(
         modifier
             .pressScale(interaction)
             .size(48.dp)
             .clip(HauntShapes.pill)
-            .background(animateColorAsState(if (selected) c.selected else c.selected.copy(alpha = 0f), HauntMotion.snappy(), label = "toolbar").value)
+            .drawBehind { drawRect(fill.value) }
             .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button, onClick = onClick)
             .semantics {
                 this.contentDescription = contentDescription
