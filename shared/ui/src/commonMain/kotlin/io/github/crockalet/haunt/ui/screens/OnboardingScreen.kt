@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +30,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.github.crockalet.haunt.ui.components.GhostMarker
+import io.github.crockalet.haunt.ui.components.HauntAppIcon
+import io.github.crockalet.haunt.ui.components.HauntWordmark
 import io.github.crockalet.haunt.ui.components.Icon
 import io.github.crockalet.haunt.ui.components.ListGroup
 import io.github.crockalet.haunt.ui.components.PrimaryButton
@@ -148,14 +148,13 @@ fun OnboardingScreen(
             Text("Step ${state.stepNumber} of ${state.totalSteps}", style = HauntTheme.type.label, color = c.muted)
         }
 
-        Box(Modifier.fillMaxWidth().padding(top = 18.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(176.dp), contentAlignment = Alignment.Center) {
-                Canvas(Modifier.size(176.dp)) {
-                    drawCircle(c.halo)
-                    drawCircle(c.selected, radius = 66.dp.toPx())
-                }
-                GhostMarker(width = 60.dp, contentDescription = "Haunt", strokeWidth = 2.5f, shadowOffset = 6.dp)
-            }
+        Column(
+            Modifier.fillMaxWidth().padding(top = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            HauntAppIcon(size = 112.dp)
+            HauntWordmark()
         }
 
         Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

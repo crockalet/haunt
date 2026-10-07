@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon background: the map art of logo 3a (docs/brand/icon-3a.svg), light palette.
+     The design's 100-unit square maps to 64dp centred on the 108dp canvas (scale 0.64, offset 22) so the
+     foreground's pin stays inside the 66dp safe zone; shapes are extended to fill the whole canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.64"
+        android:scaleY="0.64"
+        android:translateX="22"
+        android:translateY="22">
+        <path
+            android:fillColor="#FFF1F1EF"
+            android:pathData="M-40,-40H140V140H-40Z" />
+        <path
+            android:fillColor="#FFE2EADC"
+            android:pathData="M-40,-40H48C44,18 24,30 -5,34L-40,38.8Z" />
+        <path
+            android:fillColor="#FFD6E3EC"
+            android:pathData="M140,53.9L105,60C82,64 66,82 62,105L55.9,140H140Z" />
+        <path
+            android:pathData="M-40,57L140,21"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="6" />
+        <path
+            android:pathData="M42.82,-40L59.18,140"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4" />
+    </group>
+</vector>

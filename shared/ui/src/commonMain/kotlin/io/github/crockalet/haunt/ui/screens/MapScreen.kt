@@ -143,7 +143,6 @@ fun MapScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Haunt", Modifier.fillMaxWidth().padding(horizontal = 8.dp), style = HauntTheme.type.title)
             SearchPill(
                 placeholder = state.searchPlaceholder,
                 leadingIcon = if (state.mode == MapMode.Route) HauntIcons.Plus else HauntIcons.Search,

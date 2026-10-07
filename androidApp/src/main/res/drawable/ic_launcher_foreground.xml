@@ -1,19 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive-icon foreground (108dp canvas, 66dp safe zone): the ghost marker's outline
-     (shared/ui GhostMarker, 44×52 viewBox) in white, with its eyes cut out. -->
+<!-- Adaptive-icon foreground: logo 3a's frosted ghost, dotted trail and pin, in the same 0.64 / 22 mapping
+     as ic_launcher_background. The trail's SVG dash pattern (0.1 5.5, round caps) is drawn as dots. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:scaleX="0.9"
-        android:scaleY="0.9"
-        android:translateX="34.2"
-        android:translateY="30.6">
+        android:scaleX="0.64"
+        android:scaleY="0.64"
+        android:translateX="22"
+        android:translateY="22">
+        <group
+            android:scaleX="0.78"
+            android:scaleY="0.78"
+            android:translateX="1"
+            android:translateY="19.44">
+            <path
+                android:fillColor="#F2F7F7F8"
+                android:pathData="M30,48a20,20 0,0 1,40 0v28l-6.67,-5 -6.66,5 -6.67,-5 -6.67,5 -6.66,-5L30,76z"
+                android:strokeColor="#19101318"
+                android:strokeWidth="2.6" />
+            <path
+                android:fillColor="#FF535A68"
+                android:pathData="M39.6,48a3.4,5 0,1 0,6.8 0a3.4,5 0,1 0,-6.8 0Z M53.6,48a3.4,5 0,1 0,6.8 0a3.4,5 0,1 0,-6.8 0Z" />
+        </group>
+        <path
+            android:fillColor="#FF2F6BFF"
+            android:pathData="M54.5,40a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0Z M57.61,35.35a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0Z M61.35,31.19a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0Z M66.03,28.17a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0Z" />
+        <path
+            android:fillColor="#FF2F6BFF"
+            android:pathData="M78,12a10,10 0,0 1,10 10c0,7 -10,18 -10,18s-10,-11 -10,-18a10,10 0,0 1,10 -10z" />
         <path
             android:fillColor="#FFFFFFFF"
-            android:fillType="evenOdd"
-            android:pathData="M22,2C11,2 4,10 4,21L4,48L10,43L16,48L22,43L28,48L34,43L40,48L40,21C40,10 33,2 22,2Z M12.5,21a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0Z M24.5,21a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0Z" />
+            android:pathData="M74.5,22a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0Z" />
     </group>
 </vector>

@@ -39,6 +39,10 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
    squeezed beside the small Stop; (d) the overlay permission is a separate "Allow" row, never tied to the setting.
    Re-check on the phone: pad in Joystick mode with a pin running → Start → steer; float switch on/off in the card
    and Settings; Allow → grant → back (row disappears, overlay shows when Haunt goes to the background).
+   Done 2026-10-07: logo 3a "Big Glass Ghost" (DESIGN §8 "Brand", `docs/brand/`): adaptive launcher icon with a
+   themed monochrome layer, ghost-silhouette notification icon, app icon + wordmark on onboarding, no "Haunt" title
+   on the map (search pill at the top). Re-check on the phone: launcher icon under the phone's mask, themed icons on,
+   status-bar glyph.
    Earlier: FOSSGIS also wants the operator contact e-mail ([contact], now in the app and README) on the website and store listings. Done 2026-10-07: map attribution and Settings → About → Data & licences (see DESIGN §8 "Attribution"; screenshots `15-data-licences-*`, `16-licence-text-*`) — map corner credits shown at startup, folding into (i) on the first gesture; OSM / OpenMapTiles / OpenFreeMap / OSRM / FOSSGIS / Photon credits with "Report a map error"; generated open-source licence list (AboutLibraries plugin, offline) plus bundled native notices. Needs an on-device check: credits pill placement above the locate button, links opening the browser, fold on pan / zoom. Done 2026-10-07: with the default routing settings, walk/cycle speeds route on FOSSGIS's `routed-foot` / `routed-bike` OSRM servers (car speeds stay on the OSRM demo); requests are spaced ≥ 1 s apart per their usage policies. Done 2026-10-06: Haunt's own map style (`HauntMapStyle`: light / dark from the theme palette over OpenFreeMap tiles, no icons; previews `docs/screenshots/14-map-style-*.png` rendered with MapLibre GL JS), service endpoint editor (URL + routing profile, validation, reset), full activity-log screen (error details, clear), update rate applies live.
 3. **Release prep (M5)**: release signing, F-Droid metadata, Play listing "Haunt: Fake GPS Location" (Play may ask about the `specialUse` FGS), CLI distribution (fat JAR now; consider GraalVM native image / Homebrew).
 4. Backlog features: see `docs/DESIGN.md` §1 (QS tile, realism/jitter, scenario files, desktop companion for iOS, …).
@@ -61,8 +65,10 @@ real device or emulator yet** (the cloud machine that built it has no KVM). The 
 | "Float over other apps" is an app setting; the overlay permission is only shown ("Allow") next to it | User request (2026-10-07): the switch must always toggle, whatever the permission. |
 | Map style generated in code (`HauntMapStyle`) from the theme's map colours, not a hosted style | Real map matches the drawn one and the glass UI, follows light / dark, no style server to host; any OpenMapTiles TileJSON works. |
 | Fonts: Plus Jakarta Sans (UI), JetBrains Mono (data) | Bundled, OFL. |
+| Logo 3a "Big Glass Ghost"; launcher icon in the light palette | User's pick from the Claude Design logo rounds (2026-10-07). Launcher icons can't follow the app theme. |
 | UI starts / stops faking only on explicit Start / Stop; mode switches, pins, stops, places only prepare; a running spoof survives mode switches until Start | User request before release (2026-10-07). The ADB API and CLI are unchanged: agents call them on purpose. |
 
 ## Design references
 - Mockups canvas (user's claude.ai account): https://claude.ai/artifact/BjzUyRME1DM2KfYsU3EkTG — the "Final direction" row is canonical.
 - Rendered app screens: `docs/screenshots/`.
+- Brand assets (icon, wordmark, 512 px Play icon): `docs/brand/`.

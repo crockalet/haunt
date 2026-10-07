@@ -285,8 +285,27 @@ so it shares across platforms and is not tied to Material.
 - Map: a custom MapLibre style matching the mockups (soft neutral land, muted parks/water, white roads in light;
   charcoal equivalents in dark).
 
+**Brand: logo 3a "Big Glass Ghost"** (picked 2026-10-07 from the Claude Design logo file; sources in `docs/brand/`).
+All three pieces share one ghost path (`M30 48a20 20 0 0 1 40 0v28l-6.67-5-6.66 5-6.67-5-6.67 5-6.66-5L30 76z`)
+and take their colours from the theme palette.
+- **App icon** (`icon-3a.svg`, 100×100 units, rounded square rx 23): map background with a park top-left, water
+  bottom-right and two major roads; a big frosted ghost (glass-fallback fill, divider outline, grey `muted` eyes);
+  a dotted accent trail to an accent pin with a major-road centre. Uses: Android adaptive launcher icon (light palette
+  only, as launchers can't follow the app theme: `res/drawable/ic_launcher_background.xml` = map art,
+  `ic_launcher_foreground.xml` = ghost + trail + pin, with the 100-unit square at 64dp so the pin stays inside the
+  66dp safe zone under any mask); Play store icon `icon-512.png` (full square, no rounding; Play masks it);
+  in-app `HauntAppIcon` (Compose Canvas, follows light / dark).
+- **Wordmark** (`wordmark-3a.svg`, text outlined from Plus Jakarta Sans SemiBold): glass pill holding the ghost
+  outline glyph (muted stroke, grey eyes), "haunt" in lowercase (30sp, weight 600, −0.8 letter-spacing) and a 20dp
+  accent dot. In-app `HauntWordmark`, under the app icon at the top of every onboarding step.
+- **Monochrome glyph**: the solid ghost silhouette, no eyes (viewBox `27 25 46 54`). Uses: notification / status-bar
+  icon `ic_stat_haunt.xml` and the Android 13 themed-icon layer `ic_launcher_monochrome.xml`.
+- The map's location marker (`GhostMarker`: accent ghost with a white outline) is unchanged; the logo mocks show a
+  pin-plus-ghost marker concept that has not been adopted.
+
 **Map screen** (single main screen; map takes the full screen, no bottom nav)
-- Top: glass search pill (places + coordinate paste) with Library and Settings buttons; a status chip below it.
+- Top: glass search pill (places + coordinate paste) with Library and Settings buttons, right under the status bar
+  (no app title); a status chip below it.
 - Bottom, **collapsed by default:** a floating toolbar with **Pin · Route · Joystick**
   (+ pause while a route plays) and an expand arrow, plus a separate round **Start / Stop** button.
 - **Starting and stopping are always explicit.** Switching mode, long-pressing the map, picking a search
@@ -350,7 +369,8 @@ The details card grows out of the toolbar and springs to fit its content; switch
 screens scale-and-fade; the search pill morphs into the search field (`Modifier.morph(key)`, shared bounds);
 buttons and chips have springy press feedback; the joystick knob springs back on release.
 **Onboarding:** enable developer options → select mock app (deep link to settings, live check) →
-location + notification permissions → done.
+location + notification permissions → done. Each step opens with the app icon above the glass wordmark pill,
+then the step's title and text.
 
 ---
 
