@@ -2,11 +2,14 @@ package io.github.crockalet.haunt.ui.map
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.ui.components.LocationMarker
@@ -30,8 +33,15 @@ import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
+import kotlin.math.roundToInt
 
 private fun LatLng.toPosition() = Position(longitude = lng, latitude = lat)
+
+/** Accuracy halo radius on screen, in whole dp (sub-dp changes aren't worth a recomposition). */
+internal fun haloRadius(accuracyMeters: Float?, metersPerDp: Double?): Dp =
+    accuracyMeters
+        ?.let { acc -> metersPerDp?.takeIf { it > 0 }?.let { (acc / it).roundToInt().dp } }
+        ?.coerceIn(18.dp, 120.dp) ?: 50.dp
 
 private fun lineJson(points: List<LatLng>): String =
     if (points.size < 2) {
@@ -69,9 +79,9 @@ actual fun HauntMap(
         baseStyle = baseStyle,
         initialCameraPosition = CameraPosition(target = start.toPosition(), zoom = 15.5),
     ) {
-        val route = rememberGeoJsonSource(GeoJsonData.JsonString(lineJson(content.route)))
-        val traveled = rememberGeoJsonSource(GeoJsonData.JsonString(lineJson(content.traveled)))
-        val trail = rememberGeoJsonSource(GeoJsonData.JsonString(lineJson(content.trail)))
+        val route = rememberGeoJsonSource(remember(content.route) { GeoJsonData.JsonString(lineJson(content.route)) })
+        val traveled = rememberGeoJsonSource(remember(content.traveled) { GeoJsonData.JsonString(lineJson(content.traveled)) })
+        val trail = rememberGeoJsonSource(remember(content.trail) { GeoJsonData.JsonString(lineJson(content.trail)) })
         LineLayer(
             id = "haunt-route-rest", source = route,
             color = const(c.accent), opacity = const(0.45f), width = const(6.dp),
@@ -93,6 +103,12 @@ actual fun HauntMap(
     LaunchedEffect(content.camera, content.follow) {
         val target = content.camera ?: return@LaunchedEffect
         if (content.follow) mapState.animateCamera(CameraUpdate(target = target.toPosition()))
+    }
+
+    // Derived so camera frames (every frame while following) only recompose the overlay when the halo's size changes.
+    val accuracy by rememberUpdatedState(content.accuracyMeters)
+    val halo by remember(mapState) {
+        derivedStateOf(structuralEqualityPolicy()) { haloRadius(accuracy, mapState.viewport?.metersPerDpAtTarget) }
     }
 
     val interactions = remember {
@@ -117,10 +133,6 @@ actual fun HauntMap(
             content.route.firstOrNull()?.let { RouteEndpoint(start = true, modifier = Modifier.placedAt(it.toPosition())) }
             if (content.route.size >= 2) RouteEndpoint(start = false, modifier = Modifier.placedAt(content.route.last().toPosition()))
             content.fix?.let { fix ->
-                val metersPerDp = mapState.viewport?.metersPerDpAtTarget
-                val halo = content.accuracyMeters
-                    ?.let { acc -> metersPerDp?.takeIf { it > 0 }?.let { (acc / it).dp } }
-                    ?.coerceIn(18.dp, 120.dp) ?: 50.dp
                 LocationMarker(
                     modifier = Modifier.placedAt(fix.toPosition()),
                     showHalo = content.showHalo,

@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -75,10 +76,9 @@ import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.MapStyle
-import io.github.crockalet.haunt.ui.state.MapUiState
+import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.Place
-import io.github.crockalet.haunt.ui.state.collectUiState
 import io.github.crockalet.haunt.ui.state.detectCoordinates
 import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntTheme
@@ -112,20 +112,14 @@ fun HauntApp(
     HauntTheme(state.theme) {
         val haze = rememberHazeState()
         val holder = state.map
-        val ui = holder.collectUiState()
         val colors = HauntTheme.colors
 
-        PlatformBackHandler(enabled = state.screen != Screen.Map || ui.expanded) { state.back() }
+        PlatformBackHandler(enabled = state.screen != Screen.Map || holder.expanded) { state.back() }
 
         // Blur at reduced resolution: indistinguishable at these radii, far cheaper while things move.
         CompositionLocalProvider(LocalHazeState provides haze, LocalHazePerformanceMode provides HazePerformanceMode.Performance) {
             Box(modifier.fillMaxSize().background(colors.map)) {
-                HauntMap(
-                    content = ui.map,
-                    style = mapStyle,
-                    onLongPress = holder::onMapLongPress,
-                    modifier = Modifier.fillMaxSize().hazeSource(haze),
-                )
+                MapBackground(holder, mapStyle, Modifier.fillMaxSize().hazeSource(haze))
 
                 val onboarding = state.onboarding
                 if (onboarding != null) {
@@ -152,7 +146,7 @@ fun HauntApp(
                         ) { screen ->
                             CompositionLocalProvider(LocalMorphScope provides MorphScope(this@SharedTransitionLayout, this)) {
                                 if (screen == Screen.Map) {
-                                    MapLayer(state, ui, data)
+                                    MapLayer(state, data)
                                 } else {
                                     CompositionLocalProvider(LocalGlassMode provides GlassMode.Tint) {
                                         Sheet(screen, state, data, parseCoordinates, onThemeChange)
@@ -195,43 +189,66 @@ private val Screen.depth: Int
         Screen.ActivityLog, Screen.Service -> 2
     }
 
+/** The map alone in its own scope: engine ticks recompose it (and [MapLayer]), not the whole app. */
 @Composable
-private fun MapLayer(state: HauntAppState, ui: MapUiState, data: HauntAppData) {
+private fun MapBackground(holder: MapStateHolder, style: MapStyle, modifier: Modifier) {
+    HauntMap(
+        content = holder.mapContent,
+        style = style,
+        onLongPress = holder::onMapLongPress,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun MapLayer(state: HauntAppState, data: HauntAppData) {
+    MapScreen(state = state.map.shown, actions = rememberMapActions(state, data))
+}
+
+/**
+ * The map screen's callbacks, built once: they read the current UI state and [data] when called,
+ * so [MapScreen] can skip when only the engine state changed.
+ */
+@Composable
+internal fun rememberMapActions(state: HauntAppState, data: HauntAppData): MapActions {
     val holder = state.map
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
-    MapScreen(
-        state = ui,
-        actions = remember(holder, state, data) {
-            MapActions(
-                onModeSelect = holder::selectMode,
-                onToggleExpanded = holder::toggleExpanded,
-                onPlayPause = holder::playPause,
-                onStop = holder::stop,
-                onSearch = { state.navigate(Screen.Search) },
-                onLibrary = { state.navigate(Screen.Library) },
-                onSettings = { state.navigate(Screen.Settings) },
-                onSpeedPreset = holder::setSpeedPreset,
-                onFollowRoads = holder::setFollowRoads,
-                onLoop = holder::setLoop,
-                onRate = holder::cycleRate,
-                onCustomSpeed = holder::setCustomSpeed,
-                onJoystick = holder::joystickInput,
-                onJoystickMaxSpeed = holder::setJoystickMaxSpeed,
-                onJoystickSize = { size -> state.updateDefaults(data) { it.copy(joystickSize = size) } },
-                onFloatingJoystick = { on -> state.updateDefaults(data) { it.copy(floatingJoystick = on) } },
-                onJoystickMoved = { x, y -> state.updateDefaults(data) { it.copy(joystickOffsetX = x, joystickOffsetY = y) } },
-            )
-        }.copy(
-            onLocate = data.locateMe?.let { locateMe -> { holder.locate(locateMe) } },
+    val currentData by rememberUpdatedState(data)
+    val canLocate = data.locateMe != null
+    return remember(state, clipboard, canLocate) {
+        MapActions(
+            onModeSelect = holder::selectMode,
+            onToggleExpanded = holder::toggleExpanded,
+            onPlayPause = holder::playPause,
+            onStop = holder::stop,
+            onSearch = { state.navigate(Screen.Search) },
+            onLibrary = { state.navigate(Screen.Library) },
+            onSettings = { state.navigate(Screen.Settings) },
             onCopyCoordinates = {
-                ui.map.fix?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
+                holder.shown.map.fix?.let { clipboard.setText(AnnotatedString(Format.coords(it))) }
             },
             onSaveFavourite = {
-                ui.map.fix?.let { data.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
+                val ui = holder.shown
+                ui.map.fix?.let { currentData.onSaveFavourite(Place(ui.pin?.title ?: "Dropped pin", it)) }
             },
-        ),
-    )
+            onSpeedPreset = holder::setSpeedPreset,
+            onFollowRoads = holder::setFollowRoads,
+            onLoop = holder::setLoop,
+            onRate = holder::cycleRate,
+            onCustomSpeed = holder::setCustomSpeed,
+            onJoystick = holder::joystickInput,
+            onJoystickMaxSpeed = holder::setJoystickMaxSpeed,
+            onJoystickSize = { size -> state.updateDefaults(currentData) { it.copy(joystickSize = size) } },
+            onFloatingJoystick = { on -> state.updateDefaults(currentData) { it.copy(floatingJoystick = on) } },
+            onJoystickMoved = { x, y -> state.updateDefaults(currentData) { it.copy(joystickOffsetX = x, joystickOffsetY = y) } },
+            onLocate = if (canLocate) {
+                { currentData.locateMe?.let(holder::locate) }
+            } else {
+                null
+            },
+        )
+    }
 }
 
 /** The glass sheets over the blurred map: Search, Library, Settings and Settings' sub-screens. */
@@ -342,7 +359,7 @@ private fun Search(
     val holder = state.map
     val query = state.searchQuery
     val detected = remember(query) { query.takeIf { it.isNotBlank() }?.let(parseCoordinates) }
-    val nearbyOf: LatLng? = detected?.position ?: holder.local.lastPosition
+    val nearbyOf: LatLng? = detected?.position ?: holder.lastPosition
     val placeSearch = data.placeSearch
 
     val results: List<Place>
