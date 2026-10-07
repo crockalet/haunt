@@ -51,8 +51,8 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
- * The backdrop glass surfaces blur. Provide it around the map's `hazeSource`. When null, glass
- * falls back to a solid, near-opaque surface.
+ * The backdrop glass surfaces blur. Provide it around the map's `hazeSource`. When null, there is
+ * no live blur and glass uses the denser [GlassMode.Solid] tint.
  */
 val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
@@ -64,7 +64,7 @@ enum class GlassMode {
     /** Plain translucent glass tint, used over an already-blurred veil. */
     Tint,
 
-    /** Near-opaque solid fallback when blur is unavailable. */
+    /** Denser tint (`glassSolid`) when there is no live blur behind the glass. */
     Solid,
 }
 
@@ -257,7 +257,7 @@ private val Saturate = ColorFilter.colorMatrix(ColorMatrix().apply { setToSatura
 
 /**
  * Frosted glass surface: translucent tint over a blurred backdrop (Haze), a 1dp light border
- * and a soft outer shadow. Falls back to a solid surface when there is no backdrop.
+ * and a soft outer shadow. Without a backdrop to blur it uses a denser tint instead.
  */
 @Composable
 fun GlassSurface(
@@ -278,13 +278,13 @@ fun GlassSurface(
             blurRadius(blurRadius)
             noiseFactor(0f)
             colorEffects(listOf(HazeColorEffect.colorFilter(Saturate), HazeColorEffect.tint(colors.glass)))
-            fallbackColorEffect(HazeColorEffect.tint(colors.glassFallback))
+            fallbackColorEffect(HazeColorEffect.tint(colors.glassSolid))
         }
     }
     val surface = when (mode) {
         GlassMode.Blur -> Modifier.hazeBlur(HazeInput.Sources(haze!!), style)
         GlassMode.Tint -> Modifier.background(colors.glass)
-        GlassMode.Solid -> Modifier.background(colors.glassFallback)
+        GlassMode.Solid -> Modifier.background(colors.glassSolid)
     }
     Box(
         modifier
@@ -299,7 +299,8 @@ fun GlassSurface(
 
 /**
  * Full-screen veil behind overlay screens (Search, Library, Settings, Onboarding): a strong blur
- * of the map plus a scrim. Glass inside it switches to [GlassMode.Tint].
+ * of the map plus a scrim, or a denser scrim without live blur. Glass inside it switches to
+ * [GlassMode.Tint].
  */
 @Composable
 fun GlassVeil(
@@ -314,14 +315,14 @@ fun GlassVeil(
             blurRadius(blurRadius)
             noiseFactor(0f)
             colorEffects(listOf(HazeColorEffect.tint(colors.scrim)))
-            fallbackColorEffect(HazeColorEffect.tint(colors.scrim.copy(alpha = 0.94f)))
+            fallbackColorEffect(HazeColorEffect.tint(colors.scrimSolid))
         }
     }
     Box(modifier) {
         Box(
             Modifier.matchParentSize().then(
                 if (haze != null) Modifier.hazeBlur(HazeInput.Sources(haze), style)
-                else Modifier.background(colors.map).background(colors.scrim),
+                else Modifier.background(colors.scrimSolid),
             ),
         )
         CompositionLocalProvider(LocalGlassMode provides GlassMode.Tint) {
