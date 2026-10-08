@@ -88,7 +88,7 @@ class JoystickOverlay(private val context: Context, private val runtime: HauntRu
         val compose = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
-            setContent { Content() }
+            setContent { OverlayContent() }
         }
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -132,7 +132,7 @@ class JoystickOverlay(private val context: Context, private val runtime: HauntRu
     }
 
     @Composable
-    private fun Content() {
+    private fun OverlayContent() {
         val settings by runtime.settings.collectAsState()
         var bearing by remember { mutableDoubleStateOf(lastBearing) }
         var magnitude by remember { mutableDoubleStateOf(0.0) }
