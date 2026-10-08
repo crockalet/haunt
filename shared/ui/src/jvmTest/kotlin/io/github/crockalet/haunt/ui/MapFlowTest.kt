@@ -19,6 +19,7 @@ import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
+import io.github.crockalet.haunt.ui.state.UiScale
 import io.github.crockalet.haunt.ui.theme.ThemeMode
 import javax.swing.SwingUtilities
 import kotlin.test.Test
@@ -113,7 +114,7 @@ class MapFlowTest {
             // Start (and the small Stop beside it) fit on a 360 dp screen.
             val start = bounds("Start joystick")
             assertTrue(start.left >= 0f && start.right <= 360f, "Start at $start")
-            assertTrue(start.width >= 63.5f, "Start squeezed to ${start.width} dp")
+            assertTrue(start.width >= 63.5f * UiScale.factor(UiScale.DEFAULT), "Start squeezed to ${start.width} dp")
             val stop = bounds("Stop haunting")
             assertTrue(stop.left >= 0f && stop.right <= start.left, "Stop at $stop")
 

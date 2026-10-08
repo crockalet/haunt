@@ -19,11 +19,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -33,9 +31,12 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -53,6 +55,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.ui.components.Chip
@@ -62,7 +65,7 @@ import io.github.crockalet.haunt.ui.components.GlassIconButton
 import io.github.crockalet.haunt.ui.components.GlassSurface
 import io.github.crockalet.haunt.ui.components.GlassToolbar
 import io.github.crockalet.haunt.ui.components.IconButton
-import io.github.crockalet.haunt.ui.components.JoystickGrip
+import io.github.crockalet.haunt.ui.components.JoystickMover
 import io.github.crockalet.haunt.ui.components.JoystickPad
 import io.github.crockalet.haunt.ui.components.ProgressBar
 import io.github.crockalet.haunt.ui.components.SearchPill
@@ -79,7 +82,9 @@ import io.github.crockalet.haunt.ui.components.VerticalHairline
 import io.github.crockalet.haunt.ui.components.morph
 import io.github.crockalet.haunt.ui.icons.HauntIcons
 import io.github.crockalet.haunt.ui.state.JoystickDetails
+import io.github.crockalet.haunt.ui.state.JoystickPlacement
 import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.JoystickStyle
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.MapStateHolder
 import io.github.crockalet.haunt.ui.state.MapUiState
@@ -89,6 +94,7 @@ import io.github.crockalet.haunt.ui.state.SpeedPreset
 import io.github.crockalet.haunt.ui.state.StatusUi
 import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntTheme
+import kotlin.math.roundToInt
 
 /** Callbacks of the map screen. All default to no-ops (previews). */
 @Immutable
@@ -112,14 +118,17 @@ data class MapActions(
     val onJoystick: (bearingDeg: Double, magnitude: Double) -> Unit = { _, _ -> },
     val onJoystickMaxSpeed: (Float) -> Unit = {},
     val onJoystickSize: (JoystickSize) -> Unit = {},
+    val onJoystickStyle: (JoystickStyle) -> Unit = {},
     val onFloatingJoystick: (Boolean) -> Unit = {},
     /** Ask for "Display over other apps" (the floating joystick's permission). */
     val onAllowOverlay: () -> Unit = {},
     /** The pad was dragged to a new offset (dp from its default spot); persist it. */
     val onJoystickMoved: (xDp: Float, yDp: Float) -> Unit = { _, _ -> },
+    /** The user moved the pad with a hold for the first time; stop showing the hint. */
+    val onJoystickMoveLearned: () -> Unit = {},
     /** Locate button (real device location); null hides it. */
     val onLocate: (() -> Unit)? = null,
-    /** Height from the bottom of the window that the map's attribution must clear (toolbar and locate button). */
+    /** Height (chrome dp) from the bottom of the window that the map's attribution must clear (toolbar and locate button). */
     val onBottomChrome: (Dp) -> Unit = {},
 )
 
@@ -133,13 +142,15 @@ fun MapScreen(
     actions: MapActions,
     modifier: Modifier = Modifier,
 ) {
-    // Only read while dragging the pad, so not state: layout passes (e.g. the card expanding) mustn't recompose.
-    val area = remember { Bounds() }
+    val padLayout = remember { PadLayout() }
     Box(
         modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .onGloballyPositioned { area.rect = it.boundsInRoot() },
+            .onGloballyPositioned {
+                padLayout.area = it.boundsInRoot()
+                padLayout.window = it.findRootCoordinates().size
+            },
     ) {
         Column(
             Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp),
@@ -168,27 +179,25 @@ fun MapScreen(
             }
         }
 
+        // Shown in Joystick mode right away, but it only steers once Start has started the joystick.
+        AnimatedVisibility(
+            state.joystick != null,
+            enter = fadeIn(HauntMotion.snappy()),
+            exit = fadeOut(HauntMotion.snappy()),
+        ) {
+            // Keep showing the last pad while it animates out. A plain holder: writing state here
+            // would recompose this twice per joystick update.
+            val last = remember { LastJoystick() }
+            state.joystick?.let { last.value = it }
+            last.value?.let { j -> MovableJoystick(j, padLayout, actions) }
+        }
+
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 18.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f)) {
-                    // Shown in Joystick mode right away, but it only steers once Start has started the joystick.
-                    AnimatedVisibility(
-                        state.joystick != null,
-                        enter = fadeIn(HauntMotion.snappy()),
-                        exit = fadeOut(HauntMotion.snappy()),
-                    ) {
-                        // Keep showing the last pad while it animates out. A plain holder: writing state here
-                        // would recompose this twice per joystick update.
-                        val last = remember { LastJoystick() }
-                        state.joystick?.let { last.value = it }
-                        last.value?.let { j ->
-                            Column {
-                                MovableJoystick(j, area, actions)
-                                Spacer(Modifier.height(12.dp))
-                            }
-                        }
-                    }
-                }
+            Row(
+                Modifier.fillMaxWidth().onGloballyPositioned { padLayout.chromeTop = it.boundsInRoot().top },
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.Bottom,
+            ) {
                 actions.onLocate?.let { onLocate ->
                     LocateButton(state.locating, onLocate, Modifier.padding(end = 12.dp, bottom = LocateButtonGap))
                 }
@@ -224,6 +233,7 @@ fun MapScreen(
             Row(
                 Modifier.fillMaxWidth().onGloballyPositioned { toolbar ->
                     // Measured from the window bottom, which is also the map's (it fills the window).
+                    padLayout.toolbarTop = toolbar.boundsInRoot().top
                     val fromBottom = toolbar.findRootCoordinates().size.height - toolbar.boundsInRoot().top
                     actions.onBottomChrome(with(density) { fromBottom.toDp() })
                 },
@@ -294,13 +304,25 @@ private fun LocateButton(locating: Boolean, onClick: () -> Unit, modifier: Modif
 private val LocateButtonSize = 52.dp
 private val LocateButtonGap = 12.dp
 
-private class LastJoystick {
-    var value: JoystickDetails? = null
+/** Map credits pill (up to two lines, ~46 dp) plus its 8 dp gaps above the toolbar. */
+private val AttributionClearance = 56.dp
+
+/**
+ * Where the pad may sit, in root px (the window, which the map fills edge to edge). State, but only read
+ * while placing the pad, so layout passes (e.g. the card expanding) re-place it without recomposing.
+ */
+@Stable
+private class PadLayout {
+    var window by mutableStateOf(IntSize.Zero)
+    /** The safe area. */
+    var area by mutableStateOf(Rect.Zero)
+    /** Top of the locate button / details card above the toolbar. */
+    var chromeTop by mutableStateOf(Float.POSITIVE_INFINITY)
+    var toolbarTop by mutableStateOf(Float.POSITIVE_INFINITY)
 }
 
-/** Layout bounds kept outside snapshot state: written on every layout pass, read only in gestures. */
-private class Bounds {
-    var rect: Rect = Rect.Zero
+private class LastJoystick {
+    var value: JoystickDetails? = null
 }
 
 /** Shared-element keys for [morph] transitions between screens. */
@@ -309,54 +331,83 @@ object MorphKeys {
 }
 
 /**
- * The joystick pad at its default spot (bottom-left) shifted by the user's offset. Drag the grip
- * on its corner to move it; it stays inside [area] (the screen's safe area, in root px).
+ * The joystick pad at its [JoystickPlacement] spot: the same screen position as the floating pad, kept
+ * inside the safe area and above the bottom chrome (it's pushed up while the card is open, not moved).
+ * Hold the knob to move it; it stays where it's dropped.
  */
 @Composable
-private fun MovableJoystick(j: JoystickDetails, areaBounds: Bounds, actions: MapActions) {
+private fun MovableJoystick(j: JoystickDetails, layout: PadLayout, actions: MapActions) {
     val density = LocalDensity.current
-    val stored = Offset(j.offsetX, j.offsetY)
+    // Top-left in root px while moving, and until the dropped spot comes back through settings.
     var live by remember { mutableStateOf<Offset?>(null) }
-    val baseBounds = remember { Bounds() }
-    val padSize = j.size.dp.dp
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val current by rememberUpdatedState(j)
+    val currentActions by rememberUpdatedState(actions)
+    val clearance = with(density) { AttributionClearance.toPx() }
+    LaunchedEffect(j.x, j.y) { live = null }
 
-    fun clamp(o: Offset): Offset {
-        val area = areaBounds.rect
-        val base = baseBounds.rect
-        if (area == Rect.Zero || base == Rect.Zero) return o
-        with(density) {
-            val minX = (area.left - base.left).toDp().value
-            val maxX = (area.right - base.right).toDp().value
-            val minY = (area.top - base.top).toDp().value
-            val maxY = (area.bottom - base.bottom).toDp().value
-            return Offset(o.x.coerceIn(minX, maxOf(minX, maxX)), o.y.coerceIn(minY, maxOf(minY, maxY)))
+    fun stored(): Offset {
+        val (x, y) = JoystickPlacement.toPixels(current.x, current.y, layout.window.width, layout.window.height, size.width, size.height)
+        return Offset(x.toFloat(), y.toFloat())
+    }
+
+    fun clamp(p: Offset): Offset {
+        val a = layout.area
+        if (a == Rect.Zero) return p
+        val bottom = minOf(a.bottom, layout.chromeTop, layout.toolbarTop - clearance)
+        val maxX = maxOf(a.left, a.right - size.width)
+        val maxY = maxOf(a.top, bottom - size.height)
+        return Offset(p.x.coerceIn(a.left, maxX), p.y.coerceIn(a.top, maxY))
+    }
+
+    // One instance for the pad's lifetime, so its gesture isn't restarted by recompositions.
+    val mover = remember {
+        object : JoystickMover {
+            var moved = false
+
+            override fun onMoveStart() {
+                moved = false
+                live = clamp(live ?: stored())
+            }
+
+            override fun onMove(delta: Offset) {
+                if (delta == Offset.Zero) return
+                moved = true
+                live = clamp((live ?: stored()) + delta)
+            }
+
+            override fun onMoveEnd() {
+                val dropped = live
+                if (!moved || dropped == null) {
+                    live = null
+                    return
+                }
+                val (fx, fy) = JoystickPlacement.toFraction(
+                    dropped.x.roundToInt(), dropped.y.roundToInt(), layout.window.width, layout.window.height, size.width, size.height,
+                )
+                currentActions.onJoystickMoved(fx, fy)
+                if (current.showMoveHint) currentActions.onJoystickMoveLearned()
+            }
         }
     }
 
     Box(
         Modifier
-            .padding(start = 14.dp)
-            .onGloballyPositioned { baseBounds.rect = it.boundsInRoot() }
+            .onSizeChanged { size = it }
             .offset {
-                val o = live ?: stored
-                IntOffset(o.x.dp.roundToPx(), o.y.dp.roundToPx())
+                val p = clamp(live ?: stored())
+                IntOffset((p.x - layout.area.left).roundToInt(), (p.y - layout.area.top).roundToInt())
             },
     ) {
         JoystickPad(
             bearingDeg = j.bearingDeg,
             magnitude = j.magnitude,
             onInput = actions.onJoystick,
-            padSize = padSize,
-            modifier = Modifier.padding(top = 12.dp, end = 12.dp),
+            padSize = j.size.dp.dp,
+            style = j.style,
             enabled = j.live,
-        )
-        JoystickGrip(
-            onDrag = { d -> live = clamp((live ?: stored) + Offset(d.x / density.density, d.y / density.density)) },
-            onDragEnd = {
-                live?.let { actions.onJoystickMoved(it.x, it.y) }
-                live = null
-            },
-            modifier = Modifier.align(Alignment.TopEnd),
+            mover = mover,
+            showMoveHint = j.showMoveHint,
         )
     }
 }
@@ -529,6 +580,15 @@ private fun JoystickCard(j: JoystickDetails, actions: MapActions) {
             Slider(j.maxSpeedKmh, actions.onJoystickMaxSpeed, valueRange = 1f..120f, contentDescription = "Max speed")
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Style", style = HauntTheme.type.bodyStrong)
+            SegmentedControl(
+                options = JoystickStyle.entries,
+                selected = j.style,
+                onSelect = actions.onJoystickStyle,
+                label = { it.label },
+            )
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Pad size", style = HauntTheme.type.bodyStrong)
             SegmentedControl(
                 options = JoystickSize.entries,
@@ -537,6 +597,7 @@ private fun JoystickCard(j: JoystickDetails, actions: MapActions) {
                 label = { it.label },
             )
         }
+        Text("Hold the knob to move the joystick", style = HauntTheme.type.small, color = c.muted)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Float over other apps", style = HauntTheme.type.bodyStrong)

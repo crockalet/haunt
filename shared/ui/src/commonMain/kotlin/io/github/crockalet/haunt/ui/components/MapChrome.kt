@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -139,15 +141,27 @@ private fun RoundActionButton(
     }
 }
 
-/** Expanded glass details card shown above the toolbar. */
+/**
+ * Expanded glass details card shown above the toolbar. Plain glass at the top, near-solid
+ * [glassSolid][io.github.crockalet.haunt.ui.theme.HauntColors.glassSolid] at the bottom, so the map
+ * credits just above the toolbar don't read through it.
+ */
 @Composable
 fun DetailsCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val solid = HauntTheme.colors.glassSolid
+    val fade = remember(solid) {
+        Brush.verticalGradient(
+            0f to solid.copy(alpha = 0f),
+            0.4f to solid.copy(alpha = 0.3f),
+            1f to solid.copy(alpha = 0.96f),
+        )
+    }
     GlassSurface(modifier.fillMaxWidth(), shape = HauntShapes.card) {
         Column(
-            Modifier.fillMaxWidth().padding(18.dp),
+            Modifier.fillMaxWidth().drawBehind { drawRect(fade) }.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
             content = content,
         )

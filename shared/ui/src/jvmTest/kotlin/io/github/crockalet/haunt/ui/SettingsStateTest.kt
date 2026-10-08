@@ -1,16 +1,34 @@
 package io.github.crockalet.haunt.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.use
 import io.github.crockalet.haunt.core.HauntState
 import io.github.crockalet.haunt.ui.state.FakeHauntController
+import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.JoystickStyle
 import io.github.crockalet.haunt.ui.state.LocalUiState
+import io.github.crockalet.haunt.core.Speed
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.ServiceEndpoint
 import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.state.ServiceValidation
+import io.github.crockalet.haunt.ui.state.UiScale
 import io.github.crockalet.haunt.ui.state.buildMapUiState
+import io.github.crockalet.haunt.ui.theme.LocalChromeScale
+import io.github.crockalet.haunt.ui.theme.ScaledChrome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -107,19 +125,71 @@ class SettingsNavigationTest {
 
 class JoystickDefaultsTest {
     @Test
+    fun imperialShowsJoystickSpeedsInMph() {
+        val local = LocalUiState(mode = MapMode.Joystick, joystickMaxKmh = 16.09344f, joystickMagnitude = 1.0)
+        assertEquals("10 mph", assertNotNull(buildMapUiState(HauntState.Idle, local, HauntDefaults(metric = false)).joystick).speed)
+        assertEquals("16 km/h", assertNotNull(buildMapUiState(HauntState.Idle, local, HauntDefaults()).joystick).speed)
+    }
+
+    @Test
     fun padSettingsReachTheJoystickDetails() {
         val defaults = HauntDefaults(
             joystickSize = JoystickSize.Large,
+            joystickStyle = JoystickStyle.Compass,
             floatingJoystick = true,
-            joystickOffsetX = 30f,
-            joystickOffsetY = -120f,
+            joystickX = 1f,
+            joystickY = 0.4f,
         )
         val local = LocalUiState(mode = MapMode.Joystick)
         val j = assertNotNull(buildMapUiState(HauntState.Idle, local, defaults).joystick)
         assertEquals(JoystickSize.Large, j.size)
+        assertEquals(JoystickStyle.Compass, j.style)
+        assertTrue(j.showMoveHint)
+        val learned = buildMapUiState(HauntState.Idle, local, defaults.copy(joystickMoveLearned = true)).joystick
+        assertFalse(assertNotNull(learned).showMoveHint)
         assertTrue(j.floating)
-        assertEquals(30f, j.offsetX)
-        assertEquals(-120f, j.offsetY)
+        assertEquals(1f, j.x)
+        assertEquals(0.4f, j.y)
         assertNull(buildMapUiState(HauntState.Idle, local.copy(mode = MapMode.Pin), defaults).joystick)
+    }
+}
+
+class UiScaleTest {
+    @Test
+    fun clampsSnapsAndFallsBack() {
+        assertEquals(1f, UiScale.clamp(Float.NaN))
+        assertEquals(1f, UiScale.clamp(Float.NEGATIVE_INFINITY))
+        assertEquals(UiScale.MIN, UiScale.clamp(0f))
+        assertEquals(UiScale.MAX, UiScale.clamp(2f))
+        assertEquals(1.05f, UiScale.clamp(1.04f))
+        assertEquals(UiScale.BASE, UiScale.factor(HauntDefaults().uiScale))
+        assertEquals(UiScale.BASE * 1.5f, UiScale.factor(4f))
+    }
+
+    @Test
+    fun labels() {
+        assertEquals("1.00×", Format.scale(1f))
+        assertEquals("0.75×", Format.scale(0.75f))
+        assertEquals("1.15×", Format.scale(UiScale.clamp(1.149f)))
+    }
+
+    @Test
+    fun scaledChromeScalesDpAndSpButNotPx() {
+        var box = IntSize.Zero
+        var textPx = 0f
+        var nestedPx = 0f
+        ImageComposeScene(400, 400, density = Density(2f)) {
+            CompositionLocalProvider(LocalChromeScale provides 0.5f) {
+                ScaledChrome {
+                    Box(Modifier.size(100.dp).onSizeChanged { box = it })
+                    textPx = with(LocalDensity.current) { 20.sp.toPx() }
+                    // Nested chrome (e.g. the map credits) mustn't scale twice.
+                    ScaledChrome { nestedPx = with(LocalDensity.current) { 10.dp.toPx() } }
+                }
+            }
+        }.use { it.render() }
+        assertEquals(IntSize(100, 100), box)
+        assertEquals(20f, textPx)
+        assertEquals(10f, nestedPx)
     }
 }

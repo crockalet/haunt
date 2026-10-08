@@ -18,6 +18,10 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,13 +38,16 @@ import io.github.crockalet.haunt.ui.components.ListGroup
 import io.github.crockalet.haunt.ui.components.ListRow
 import io.github.crockalet.haunt.ui.components.RowDivider
 import io.github.crockalet.haunt.ui.components.SectionHeader
+import io.github.crockalet.haunt.ui.components.Slider
 import io.github.crockalet.haunt.ui.components.Switch
 import io.github.crockalet.haunt.ui.components.Text
 import io.github.crockalet.haunt.ui.icons.HauntIcons
 import io.github.crockalet.haunt.ui.state.AgentConnection
+import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.LogEntry
 import io.github.crockalet.haunt.ui.state.ServiceEndpoint
+import io.github.crockalet.haunt.ui.state.UiScale
 import io.github.crockalet.haunt.ui.theme.HauntShapes
 import io.github.crockalet.haunt.ui.theme.HauntTheme
 import io.github.crockalet.haunt.ui.theme.ThemeMode
@@ -72,8 +79,11 @@ data class SettingsActions(
     val onAccuracy: () -> Unit = {},
     val onUnits: () -> Unit = {},
     val onJoystickSize: () -> Unit = {},
+    val onJoystickStyle: () -> Unit = {},
     val onFloatingJoystick: (Boolean) -> Unit = {},
     val onAllowOverlay: () -> Unit = {},
+    /** Interface size picked (see [UiScale]). */
+    val onUiScale: (Float) -> Unit = {},
     val onDataLicences: () -> Unit = {},
 )
 
@@ -207,6 +217,8 @@ fun SettingsScreen(
                     actions.onTheme(ThemeMode.entries[(state.theme.ordinal + 1) % ThemeMode.entries.size])
                 }
                 RowDivider()
+                InterfaceSizeRow(state.defaults.uiScale, actions.onUiScale)
+                RowDivider()
                 DefaultRow("Update rate", "${state.defaults.updateRateHz} Hz", actions.onUpdateRate)
                 RowDivider()
                 DefaultRow("Accuracy", "±${state.defaults.accuracyMeters.toInt()} m", actions.onAccuracy)
@@ -219,6 +231,8 @@ fun SettingsScreen(
             SectionHeader("Joystick")
             ListGroup {
                 DefaultRow("Pad size", "${state.defaults.joystickSize.label} · ${state.defaults.joystickSize.dp.toInt()} dp", actions.onJoystickSize)
+                RowDivider()
+                DefaultRow("Pad style", state.defaults.joystickStyle.label, actions.onJoystickStyle)
                 RowDivider()
                 ListRow(
                     title = "Float over other apps",
@@ -252,6 +266,29 @@ fun SettingsScreen(
 }
 
 private val ItemPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+
+/** The UI rescales when the thumb is let go: rescaling under the finger would move the slider while it's dragged. */
+@Composable
+private fun InterfaceSizeRow(value: Float, onChange: (Float) -> Unit) {
+    var draft by remember { mutableStateOf<Float?>(null) }
+    val shown = draft ?: value
+    Column(Modifier.fillMaxWidth().padding(ItemPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Interface size", Modifier.weight(1f), style = HauntTheme.type.bodyStrong)
+            Text(Format.scale(shown), style = HauntTheme.type.monoValueSmall, color = HauntTheme.colors.muted)
+        }
+        Slider(
+            shown,
+            { draft = UiScale.clamp(it) },
+            valueRange = UiScale.MIN..UiScale.MAX,
+            contentDescription = "Interface size",
+            onValueChangeFinished = {
+                draft?.let(onChange)
+                draft = null
+            },
+        )
+    }
+}
 
 @Composable
 private fun DefaultRow(title: String, value: String, onClick: () -> Unit) {

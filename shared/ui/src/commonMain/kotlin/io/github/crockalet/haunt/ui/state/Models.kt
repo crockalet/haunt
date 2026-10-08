@@ -7,6 +7,7 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.Route
 import io.github.crockalet.haunt.core.Speed
+import kotlin.math.roundToInt
 
 /** The three map modes in the toolbar. */
 enum class MapMode { Pin, Route, Joystick }
@@ -120,12 +121,46 @@ data class DetectedCoordinates(val position: LatLng, val format: String? = null,
 @Immutable
 data class Notice(val text: String, val hint: String? = null, val error: Boolean = true)
 
-/** Joystick pad sizes (diameter in dp); the knob scales with the pad. */
+/** Joystick sizes: the travel ring's outer diameter in dp; knob, chevrons and touch area scale with it. */
 enum class JoystickSize(val label: String, val dp: Float) {
-    Small("S", 112f),
-    Medium("M", 140f),
-    Large("L", 176f),
-    ExtraLarge("XL", 216f),
+    Small("S", 90f),
+    Medium("M", 112f),
+    Large("L", 140f),
+    ExtraLarge("XL", 172f),
+}
+
+/**
+ * The joystick's spot as a fraction (0..1) of the screen's free width / height (screen minus the pad), so
+ * the in-app pad and the one floating over other apps sit in the same place and survive rotation.
+ */
+object JoystickPlacement {
+    /** Default spot: left edge, low enough for a thumb but clear of the bottom bar. */
+    const val DEFAULT_X = 0f
+    const val DEFAULT_Y = 0.72f
+
+    /** Top-left (px) for a stored fraction; null fractions mean the default spot. */
+    fun toPixels(fx: Float?, fy: Float?, screenW: Int, screenH: Int, viewW: Int, viewH: Int): Pair<Int, Int> {
+        val freeW = (screenW - viewW).coerceAtLeast(0)
+        val freeH = (screenH - viewH).coerceAtLeast(0)
+        return ((fx ?: DEFAULT_X).coerceIn(0f, 1f) * freeW).roundToInt() to ((fy ?: DEFAULT_Y).coerceIn(0f, 1f) * freeH).roundToInt()
+    }
+
+    /** Inverse of [toPixels]: the fraction to persist. */
+    fun toFraction(x: Int, y: Int, screenW: Int, screenH: Int, viewW: Int, viewH: Int): Pair<Float, Float> {
+        val freeW = (screenW - viewW).coerceAtLeast(0)
+        val freeH = (screenH - viewH).coerceAtLeast(0)
+        fun f(v: Int, free: Int) = if (free == 0) 0f else (v.toFloat() / free).coerceIn(0f, 1f)
+        return f(x, freeW) to f(y, freeH)
+    }
+}
+
+/** How the joystick is drawn. Both steer the same way and move with a hold on the knob. */
+enum class JoystickStyle(val label: String) {
+    /** Thin ring + knob; an accent arc and tether show direction and speed while driving. */
+    Halo("Halo"),
+
+    /** Four chevrons around a hollow knob; snaps to 8 headings with a tick on each change. */
+    Compass("Compass"),
 }
 
 /** Default per-user settings shown in Settings → Defaults. */
@@ -136,12 +171,40 @@ data class HauntDefaults(
     val metric: Boolean = true,
     val loop: LoopMode = LoopMode.Once,
     val joystickSize: JoystickSize = JoystickSize.Medium,
+    val joystickStyle: JoystickStyle = JoystickStyle.Halo,
+    /** The user has moved the pad with a hold at least once, so the pad stops showing the hint. */
+    val joystickMoveLearned: Boolean = false,
     /** Show the joystick over other apps while Haunt is in the background (Android). */
     val floatingJoystick: Boolean = false,
-    /** Where the user dragged the in-app pad, in dp from its default spot (bottom-left). */
-    val joystickOffsetX: Float = 0f,
-    val joystickOffsetY: Float = 0f,
+    /** Where the pad sits, shared by the in-app and floating pad (see [JoystickPlacement]); null = default spot. */
+    val joystickX: Float? = null,
+    val joystickY: Float? = null,
+    /** Settings → Interface size, on top of [UiScale.BASE] (see [UiScale]). */
+    val uiScale: Float = UiScale.DEFAULT,
 )
+
+/**
+ * How big Haunt's chrome (not the map) is drawn: [BASE] × the user's "Interface size" ([MIN]..[MAX],
+ * 1 = the default look).
+ */
+object UiScale {
+    /** The chrome's size at "1×" relative to its design size in dp / sp. */
+    const val BASE = 0.85f
+    const val DEFAULT = 1f
+    const val MIN = 0.75f
+    const val MAX = 1.5f
+    private const val STEPS_PER_UNIT = 20
+    const val STEP = 1f / STEPS_PER_UNIT
+
+    /** [user] snapped to [STEP] within [MIN]..[MAX]; [DEFAULT] when it isn't a number. */
+    fun clamp(user: Float): Float {
+        if (!user.isFinite()) return DEFAULT
+        return (user.coerceIn(MIN, MAX) * STEPS_PER_UNIT).roundToInt() / STEPS_PER_UNIT.toFloat()
+    }
+
+    /** The density factor for the user's setting. */
+    fun factor(user: Float): Float = BASE * clamp(user)
+}
 
 /** What the map draws: Haunt's own style (follows light / dark) or any MapLibre style URL. */
 @Immutable

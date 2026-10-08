@@ -18,6 +18,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -81,12 +82,16 @@ import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.JoystickStyle
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.Place
+import io.github.crockalet.haunt.ui.state.UiScale
 import io.github.crockalet.haunt.ui.state.detectCoordinates
 import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntTheme
+import io.github.crockalet.haunt.ui.theme.LocalChromeScale
+import io.github.crockalet.haunt.ui.theme.ScaledChrome
 import io.github.crockalet.haunt.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
 
@@ -104,7 +109,6 @@ import kotlinx.coroutines.delay
  * @param liveBlur blur the map behind glass (Haze). Only works when the map draws through Compose;
  *   when false there is no blur source at all and glass uses denser tints instead.
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HauntApp(
     controller: HauntController,
@@ -126,50 +130,66 @@ fun HauntApp(
         PlatformBackHandler(enabled = state.screen != Screen.Map || holder.expanded) { state.back() }
 
         // Blur at reduced resolution: indistinguishable at these radii, far cheaper while things move.
-        CompositionLocalProvider(LocalHazeState provides haze, LocalHazePerformanceMode provides HazePerformanceMode.Performance) {
+        CompositionLocalProvider(
+            LocalHazeState provides haze,
+            LocalHazePerformanceMode provides HazePerformanceMode.Performance,
+            LocalChromeScale provides UiScale.factor(holder.defaults.uiScale),
+        ) {
             Box(modifier.fillMaxSize().background(colors.map)) {
                 MapBackground(state, mapStyle, Modifier.fillMaxSize().then(if (haze != null) Modifier.hazeSource(haze) else Modifier))
-
-                val onboarding = state.onboarding
-                if (onboarding != null) {
-                    GlassVeil(Modifier.fillMaxSize(), blurRadius = HauntDefaultsUi.onboardingBlur) {
-                        OnboardingScreen(onboarding, onboardingActions)
-                    }
-                } else {
-                    // Overlay screens sit on one blurred veil that only fades (never scale a blur: it is
-                    // re-captured every frame). Their content is plain tint, so it can cross-fade and
-                    // scale cheaply; elements marked with `morph` (search pill → search field) spring
-                    // from one screen's bounds to the other's.
-                    AnimatedVisibility(
-                        visible = state.screen != Screen.Map,
-                        enter = fadeIn(HauntMotion.smooth()),
-                        exit = fadeOut(HauntMotion.snappy()),
-                    ) {
-                        GlassVeil(Modifier.fillMaxSize()) {}
-                    }
-                    SharedTransitionLayout(Modifier.fillMaxSize()) {
-                        AnimatedContent(
-                            targetState = state.screen,
-                            transitionSpec = { screenTransition(initialState, targetState) },
-                            label = "screen",
-                        ) { screen ->
-                            CompositionLocalProvider(LocalMorphScope provides MorphScope(this@SharedTransitionLayout, this)) {
-                                if (screen == Screen.Map) {
-                                    MapLayer(state, data)
-                                } else {
-                                    CompositionLocalProvider(LocalGlassMode provides GlassMode.Tint) {
-                                        Sheet(screen, state, data, parseCoordinates, onThemeChange)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Notices(holder.notice, holder::dismissNotice, Modifier.align(Alignment.TopCenter))
+                // Only the chrome scales; the map keeps the real density.
+                ScaledChrome { Box(Modifier.fillMaxSize()) { Chrome(state, data, parseCoordinates, onThemeChange, onboardingActions) } }
             }
         }
     }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun BoxScope.Chrome(
+    state: HauntAppState,
+    data: HauntAppData,
+    parseCoordinates: (String) -> DetectedCoordinates?,
+    onThemeChange: (ThemeMode) -> Unit,
+    onboardingActions: OnboardingActions,
+) {
+    val holder = state.map
+    val onboarding = state.onboarding
+    if (onboarding != null) {
+        GlassVeil(Modifier.fillMaxSize(), blurRadius = HauntDefaultsUi.onboardingBlur) {
+            OnboardingScreen(onboarding, onboardingActions)
+        }
+    } else {
+        // Overlay screens sit on one blurred veil that only fades (never scale a blur: it is
+        // re-captured every frame). Their content is plain tint, so it can cross-fade and
+        // scale cheaply; elements marked with `morph` (search pill → search field) spring
+        // from one screen's bounds to the other's.
+        AnimatedVisibility(
+            visible = state.screen != Screen.Map,
+            enter = fadeIn(HauntMotion.smooth()),
+            exit = fadeOut(HauntMotion.snappy()),
+        ) {
+            GlassVeil(Modifier.fillMaxSize()) {}
+        }
+        SharedTransitionLayout(Modifier.fillMaxSize()) {
+            AnimatedContent(
+                targetState = state.screen,
+                transitionSpec = { screenTransition(initialState, targetState) },
+                label = "screen",
+            ) { screen ->
+                CompositionLocalProvider(LocalMorphScope provides MorphScope(this@SharedTransitionLayout, this)) {
+                    if (screen == Screen.Map) {
+                        MapLayer(state, data)
+                    } else {
+                        CompositionLocalProvider(LocalGlassMode provides GlassMode.Tint) {
+                            Sheet(screen, state, data, parseCoordinates, onThemeChange)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Notices(holder.notice, holder::dismissNotice, Modifier.align(Alignment.TopCenter))
 }
 
 /** Applies [transform] to the Settings defaults and persists them. */
@@ -254,9 +274,11 @@ internal fun rememberMapActions(state: HauntAppState, data: HauntAppData): MapAc
             onJoystick = holder::joystickInput,
             onJoystickMaxSpeed = holder::setJoystickMaxSpeed,
             onJoystickSize = { size -> state.updateDefaults(currentData) { it.copy(joystickSize = size) } },
+            onJoystickStyle = { style -> state.updateDefaults(currentData) { it.copy(joystickStyle = style) } },
             onFloatingJoystick = { on -> state.updateDefaults(currentData) { it.copy(floatingJoystick = on) } },
             onAllowOverlay = { currentData.onAllowOverlay() },
-            onJoystickMoved = { x, y -> state.updateDefaults(currentData) { it.copy(joystickOffsetX = x, joystickOffsetY = y) } },
+            onJoystickMoved = { x, y -> state.updateDefaults(currentData) { it.copy(joystickX = x, joystickY = y) } },
+            onJoystickMoveLearned = { state.updateDefaults(currentData) { it.copy(joystickMoveLearned = true) } },
             onLocate = if (canLocate) {
                 { currentData.locateMe?.let(holder::locate) }
             } else {
@@ -336,8 +358,10 @@ private fun Sheet(
                 },
                 onUnits = { state.updateDefaults(data) { it.copy(metric = !it.metric) } },
                 onJoystickSize = { state.updateDefaults(data) { d -> d.copy(joystickSize = d.joystickSize.next(JoystickSize.entries)) } },
+                onJoystickStyle = { state.updateDefaults(data) { d -> d.copy(joystickStyle = d.joystickStyle.next(JoystickStyle.entries)) } },
                 onFloatingJoystick = { on -> state.updateDefaults(data) { it.copy(floatingJoystick = on) } },
                 onAllowOverlay = data.onAllowOverlay,
+                onUiScale = { v -> state.updateDefaults(data) { it.copy(uiScale = UiScale.clamp(v)) } },
                 onDataLicences = { state.navigate(Screen.DataLicences) },
             ),
         )

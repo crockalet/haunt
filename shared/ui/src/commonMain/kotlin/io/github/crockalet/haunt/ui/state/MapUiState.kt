@@ -82,10 +82,13 @@ data class JoystickDetails(
     val bearingDeg: Double,
     val magnitude: Double,
     val size: JoystickSize = JoystickSize.Medium,
+    val style: JoystickStyle = JoystickStyle.Halo,
+    /** The pad shows its "hold to move" hint until the user has moved it once. */
+    val showMoveHint: Boolean = false,
     val floating: Boolean = false,
-    /** Pad offset from its default spot, in dp. */
-    val offsetX: Float = 0f,
-    val offsetY: Float = 0f,
+    /** Pad spot as a [JoystickPlacement] fraction; null = default spot. */
+    val x: Float? = null,
+    val y: Float? = null,
     /** The engine is in joystick mode, so the pad steers; otherwise it waits for Start (faded knob, no input). */
     val live: Boolean = true,
     /** [floating] is on but Android doesn't allow drawing over other apps yet. */
@@ -261,7 +264,7 @@ internal fun buildMapUiState(
             eta = moving?.progress?.etaSeconds?.let { "ETA ${Format.duration(it)}" }
                 ?: if (total > 0) "ETA ${Format.duration((total / speed.metersPerSecond).roundToLong())}" else null,
             speedPreset = local.speedPreset,
-            speedLabel = Format.kmh(local.presetSpeed().metersPerSecond),
+            speedLabel = Format.speed(local.presetSpeed().metersPerSecond, defaults.metric),
             followRoads = local.followRoads,
             loop = moving?.loop ?: local.loop,
             rateLabel = Format.rate(moving?.playbackRate ?: local.rate.toDouble()),
@@ -278,16 +281,18 @@ internal fun buildMapUiState(
         val speedMs = fix?.speed?.toDouble() ?: (local.joystickMagnitude * local.joystickMaxKmh / 3.6)
         JoystickDetails(
             heading = "${Format.compass(heading)} ${heading.roundToLong()}°",
-            speed = Format.kmh(speedMs),
+            speed = Format.speed(speedMs, defaults.metric),
             moved = Format.distance(j?.distanceMeters ?: 0.0),
             maxSpeedKmh = local.joystickMaxKmh,
             directionLabel = Format.compass(heading),
             bearingDeg = local.joystickBearing,
             magnitude = local.joystickMagnitude,
             size = defaults.joystickSize,
+            style = defaults.joystickStyle,
+            showMoveHint = !defaults.joystickMoveLearned,
             floating = defaults.floatingJoystick,
-            offsetX = defaults.joystickOffsetX,
-            offsetY = defaults.joystickOffsetY,
+            x = defaults.joystickX,
+            y = defaults.joystickY,
             live = j != null,
             floatingNeedsPermission = defaults.floatingJoystick && !canDrawOverlays,
         )
@@ -298,7 +303,7 @@ internal fun buildMapUiState(
         local.mode == MapMode.Route && route != null && engine is HauntState.Moving ->
             StatusUi.Progress(route.fraction, route.distance, route.eta)
         local.mode == MapMode.Joystick && joystick != null && engine is HauntState.Joystick ->
-            StatusUi.Joystick(joystick.directionLabel, Format.kmh(local.joystickMaxKmh / 3.6))
+            StatusUi.Joystick(joystick.directionLabel, Format.speed(local.joystickMaxKmh / 3.6, defaults.metric))
         engine is HauntState.Holding -> StatusUi.Message("Haunting · ${engine.label ?: Format.coords(engine.fix.position, 4)}", active = true)
         engine is HauntState.Moving -> StatusUi.Message("Haunting · ${engine.routeName ?: "route"}", active = true)
         engine is HauntState.Joystick -> StatusUi.Message("Haunting · joystick", active = true)

@@ -10,6 +10,7 @@ import io.github.crockalet.haunt.ui.components.JoystickMath
 import io.github.crockalet.haunt.ui.state.FakeHauntController
 import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.Geo
+import io.github.crockalet.haunt.ui.state.JoystickPlacement
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.MapStateHolder
@@ -42,6 +43,9 @@ class FormatTest {
         assertEquals("26 min", Format.duration(26 * 60))
         assertEquals("1 h 05 min", Format.duration(3900))
         assertEquals("5 km/h", Format.kmh(Speed.Walk.metersPerSecond))
+        assertEquals("5 km/h", Format.speed(Speed.Walk.metersPerSecond, metric = true))
+        assertEquals("3 mph", Format.speed(Speed.Walk.metersPerSecond, metric = false))
+        assertEquals("NE · 5 km/h", Format.joystickReadout(42.0, Speed.Walk.metersPerSecond, metric = true))
     }
 
     @Test
@@ -90,6 +94,21 @@ class ParserTest {
     }
 }
 
+class JoystickPlacementTest {
+    @Test
+    fun fractionsRoundTripAndDefault() {
+        // 1080×2400 screen, 400×400 pad → 680×2000 free.
+        assertEquals(0 to 1440, JoystickPlacement.toPixels(null, null, 1080, 2400, 400, 400))
+        assertEquals(0 to 2000, JoystickPlacement.toPixels(0f, 1f, 1080, 2400, 400, 400))
+        assertEquals(170 to 500, JoystickPlacement.toPixels(0.25f, 0.25f, 1080, 2400, 400, 400))
+        assertEquals(0.25f to 0.25f, JoystickPlacement.toFraction(170, 500, 1080, 2400, 400, 400))
+        // Rotation: same fraction, new pixels.
+        assertEquals(500 to 170, JoystickPlacement.toPixels(0.25f, 0.25f, 2400, 1080, 400, 400))
+        // Pad bigger than the screen: no free space, stays at 0.
+        assertEquals(0f to 0f, JoystickPlacement.toFraction(10, 10, 300, 300, 400, 400))
+    }
+}
+
 class JoystickMathTest {
     @Test
     fun polarRoundTrip() {
@@ -100,6 +119,50 @@ class JoystickMathTest {
         assertTrue(abs(o.x - 10f) < 0.01f && abs(o.y + 10f) < 0.01f)
         assertEquals(1.0, JoystickMath.toPolar(0f, 100f, 10f).second)
         assertEquals(180.0, JoystickMath.toPolar(0f, 5f, 10f).first)
+    }
+
+    @Test
+    fun headings() {
+        assertEquals(0, JoystickMath.heading(0.0))
+        assertEquals(0, JoystickMath.heading(22.4))
+        assertEquals(1, JoystickMath.heading(22.6))
+        assertEquals(0, JoystickMath.heading(350.0))
+        assertEquals(7, JoystickMath.heading(315.0))
+        assertEquals(4, JoystickMath.heading(-180.0))
+    }
+
+    @Test
+    fun litChevrons() {
+        fun lit(heading: Int) = (0..3).filter { JoystickMath.isChevronLit(it, heading) }
+        assertEquals(listOf(0), lit(0))
+        assertEquals(listOf(0, 1), lit(1))
+        assertEquals(listOf(1), lit(2))
+        assertEquals(listOf(2, 3), lit(5))
+        assertEquals(listOf(0, 3), lit(7))
+    }
+
+    @Test
+    fun compassSnapsPastThreshold() {
+        // 10° off north at half travel: snapped to due north, knob on the axis.
+        val s = JoystickMath.steer(dx = 4.17f, dy = -23.6f, maxTravel = 48f, snap = true)
+        assertEquals(0, s.heading)
+        assertEquals(0.0, s.bearingDeg)
+        assertTrue(abs(s.knob.x) < 0.001f && abs(s.magnitude - 0.5) < 0.01)
+        // Below 7/48 of the travel the vector stays raw.
+        val small = JoystickMath.steer(dx = 3f, dy = -3f, maxTravel = 48f, snap = true)
+        assertEquals(null, small.heading)
+        assertTrue(abs(small.bearingDeg - 45.0) < 0.01)
+        // Halo never snaps, and clamps to the travel.
+        val halo = JoystickMath.steer(dx = 100f, dy = -10f, maxTravel = 48f, snap = false)
+        assertEquals(null, halo.heading)
+        assertEquals(1.0, halo.magnitude)
+        assertTrue(abs(halo.knob.getDistance() - 48f) < 0.01f)
+    }
+
+    @Test
+    fun holdSlop() {
+        assertTrue(!JoystickMath.breaksHold(3f, 4f, 6f))
+        assertTrue(JoystickMath.breaksHold(5f, 4f, 6f))
     }
 }
 

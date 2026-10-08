@@ -27,6 +27,7 @@ import io.github.crockalet.haunt.ui.screens.OnboardingStep
 import io.github.crockalet.haunt.ui.state.CommandException
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.JoystickStyle
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
 import io.github.crockalet.haunt.ui.state.MapStateHolder
@@ -122,17 +123,22 @@ class UiMappingTest {
     fun settingsRoundTrip() {
         val s = HauntSettings(
             updateIntervalMillis = 500, accuracyMeters = 10f, units = Units.Imperial, theme = ThemeMode.Dark,
-            joystickSize = "ExtraLarge", floatingJoystick = true, joystickOffsetX = 12f, joystickOffsetY = -40f,
+            joystickSize = "ExtraLarge", joystickStyle = "Compass", joystickMoveLearned = true,
+            floatingJoystick = true, joystickX = 0.5f, joystickY = 0.3f, uiScale = 0.8f,
         )
         val d = UiMapping.defaults(s, HauntDefaults(loop = LoopMode.Loop))
         assertEquals(
             HauntDefaults(
                 updateRateHz = 2, accuracyMeters = 10f, metric = false, loop = LoopMode.Loop,
-                joystickSize = JoystickSize.ExtraLarge, floatingJoystick = true, joystickOffsetX = 12f, joystickOffsetY = -40f,
+                joystickSize = JoystickSize.ExtraLarge, joystickStyle = JoystickStyle.Compass, joystickMoveLearned = true,
+                floatingJoystick = true, joystickX = 0.5f, joystickY = 0.3f, uiScale = 0.8f,
             ),
             d,
         )
         assertEquals(JoystickSize.Medium, UiMapping.joystickSize(HauntSettings(joystickSize = "huge")))
+        assertEquals(JoystickStyle.Halo, UiMapping.joystickStyle(HauntSettings()))
+        assertEquals(JoystickStyle.Compass, UiMapping.joystickStyle(HauntSettings(joystickStyle = "compass")))
+        assertEquals(JoystickStyle.Halo, UiMapping.joystickStyle(HauntSettings(joystickStyle = "spiky")))
         assertEquals(s, UiMapping.applyDefaults(HauntSettings(theme = ThemeMode.Dark), d))
         assertEquals(ThemeMode.Dark, UiMapping.theme(UiMapping.theme(ThemeMode.Dark)))
         assertEquals(MapStyle.Default, UiMapping.mapStyle(HauntSettings()))
@@ -263,6 +269,19 @@ class AndroidCommandsTest {
         holder.joystickInput(90.0, 1.0)
         advance(2.seconds)
         assertTrue(assertIs<HauntState.Joystick>(h.controller.state.value).distanceMeters > 0.0)
+    }
+
+    @Test
+    fun interfaceSizeRoundTripsThroughTheStore() {
+        val store = SettingsStore(InMemoryKeyValueStore())
+        var defaults = UiMapping.defaults(store.current)
+        assertEquals(1f, defaults.uiScale)
+        // What MainActivity does with the Settings slider: defaults → store → defaults.
+        store.update { UiMapping.applyDefaults(it, defaults.copy(uiScale = 1.5f)) }
+        defaults = UiMapping.defaults(store.current, defaults)
+        assertEquals(1.5f, defaults.uiScale)
+        store.update { UiMapping.applyDefaults(it, defaults.copy(uiScale = 7f)) }
+        assertEquals(1.5f, UiMapping.defaults(store.current).uiScale)
     }
 
     @Test

@@ -417,10 +417,10 @@ class HolderTest {
     @Test
     fun shownFollowsDefaultsChangedAfterConstruction() {
         val holder = MapStateHolder(RecordingController(), LocalUiState(mode = MapMode.Joystick), HauntDefaults())
-        holder.defaults = HauntDefaults(floatingJoystick = true, joystickSize = JoystickSize.Small, joystickOffsetX = 10f, joystickOffsetY = -20f, accuracyMeters = 20f)
+        holder.defaults = HauntDefaults(floatingJoystick = true, joystickSize = JoystickSize.Small, joystickX = 0.1f, joystickY = 0.2f, accuracyMeters = 20f)
         val j = assertNotNull(holder.shown.joystick)
         assertEquals(true to JoystickSize.Small, j.floating to j.size)
-        assertEquals(10f to -20f, j.offsetX to j.offsetY)
+        assertEquals(0.1f to 0.2f, j.x to j.y)
         holder.selectMode(MapMode.Pin)
         assertEquals("±20 m", holder.shown.pin?.accuracy)
     }

@@ -43,7 +43,18 @@ object Format {
         return if (abs(multiplier - whole) < 0.05) "$whole×" else "${fixed(multiplier, 1)}×"
     }
 
+    /** Interface size: "1.00×", "0.75×". */
+    fun scale(factor: Float): String = "${fixed(factor.toDouble(), 2)}×"
+
     fun kmh(metersPerSecond: Double): String = "${(metersPerSecond * 3.6).roundToLong()} km/h"
+
+    /** "5 km/h", or "3 mph" when not [metric]. */
+    fun speed(metersPerSecond: Double, metric: Boolean): String =
+        if (metric) kmh(metersPerSecond) else "${(metersPerSecond * 3600 / 1609.344).roundToLong()} mph"
+
+    /** What the floating pad shows while driving: "NE · 5 km/h". */
+    fun joystickReadout(bearingDeg: Double, metersPerSecond: Double, metric: Boolean): String =
+        "${compass(bearingDeg)} · ${speed(metersPerSecond, metric)}"
 
     /** Eight-point compass direction for a bearing. */
     fun compass(bearingDeg: Double): String {

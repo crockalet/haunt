@@ -15,6 +15,7 @@ import io.github.crockalet.haunt.ui.state.Folder
 import io.github.crockalet.haunt.ui.state.Format
 import io.github.crockalet.haunt.ui.state.HauntDefaults
 import io.github.crockalet.haunt.ui.state.JoystickSize
+import io.github.crockalet.haunt.ui.state.JoystickStyle
 import io.github.crockalet.haunt.ui.state.LogEntry
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.state.Place
@@ -201,9 +202,12 @@ object UiMapping {
         accuracyMeters = s.accuracyMeters,
         metric = s.units == Units.Metric,
         joystickSize = joystickSize(s),
+        joystickStyle = joystickStyle(s),
+        joystickMoveLearned = s.joystickMoveLearned,
         floatingJoystick = s.floatingJoystick,
-        joystickOffsetX = s.joystickOffsetX,
-        joystickOffsetY = s.joystickOffsetY,
+        joystickX = s.joystickX,
+        joystickY = s.joystickY,
+        uiScale = s.uiScale,
     )
 
     fun applyDefaults(s: HauntSettings, d: HauntDefaults): HauntSettings = s.copy(
@@ -211,11 +215,17 @@ object UiMapping {
         accuracyMeters = d.accuracyMeters,
         units = if (d.metric) Units.Metric else Units.Imperial,
         joystickSize = d.joystickSize.name,
+        joystickStyle = d.joystickStyle.name,
+        joystickMoveLearned = d.joystickMoveLearned,
         floatingJoystick = d.floatingJoystick,
-        joystickOffsetX = d.joystickOffsetX,
-        joystickOffsetY = d.joystickOffsetY,
+        joystickX = d.joystickX,
+        joystickY = d.joystickY,
+        uiScale = d.uiScale,
     )
 
     fun joystickSize(s: HauntSettings): JoystickSize =
         JoystickSize.entries.firstOrNull { it.name.equals(s.joystickSize, ignoreCase = true) } ?: JoystickSize.Medium
+
+    fun joystickStyle(s: HauntSettings): JoystickStyle =
+        JoystickStyle.entries.firstOrNull { it.name.equals(s.joystickStyle, ignoreCase = true) } ?: JoystickStyle.Halo
 }

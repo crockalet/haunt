@@ -199,7 +199,7 @@ fun Switch(
     }
 }
 
-/** Continuous slider: tile track, accent fill, white thumb. */
+/** Continuous slider: tile track, accent fill, white thumb. [onValueChangeFinished] runs after a tap or drag ends. */
 @Composable
 fun Slider(
     value: Float,
@@ -207,9 +207,11 @@ fun Slider(
     modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     contentDescription: String? = null,
+    onValueChangeFinished: () -> Unit = {},
 ) {
     val c = HauntTheme.colors
     val onChange by rememberUpdatedState(onValueChange)
+    val onFinished by rememberUpdatedState(onValueChangeFinished)
     val span = valueRange.endInclusive - valueRange.start
     val fraction = ((value - valueRange.start) / span).coerceIn(0f, 1f)
     BoxWithConstraints(
@@ -219,7 +221,11 @@ fun Slider(
             .semantics {
                 if (contentDescription != null) this.contentDescription = contentDescription
                 progressBarRangeInfo = ProgressBarRangeInfo(value, valueRange)
-                setProgress { onChange(it.coerceIn(valueRange)); true }
+                setProgress {
+                    onChange(it.coerceIn(valueRange))
+                    onFinished()
+                    true
+                }
             },
     ) {
         val thumb = 22.dp
@@ -229,8 +235,15 @@ fun Slider(
             onChange(valueRange.start + (x / widthPx).coerceIn(0f, 1f) * span)
         }
         val input = Modifier
-            .pointerInput(widthPx, valueRange) { detectTapGestures { update(it.x) } }
-            .pointerInput(widthPx, valueRange) { detectDragGestures { change, _ -> update(change.position.x) } }
+            .pointerInput(widthPx, valueRange) {
+                detectTapGestures {
+                    update(it.x)
+                    onFinished()
+                }
+            }
+            .pointerInput(widthPx, valueRange) {
+                detectDragGestures(onDragEnd = { onFinished() }, onDragCancel = { onFinished() }) { change, _ -> update(change.position.x) }
+            }
         Box(Modifier.matchParentSize().then(input)) {
             Box(Modifier.align(Alignment.CenterStart).fillMaxWidth().height(6.dp).clip(HauntShapes.pill).background(c.track))
             Box(Modifier.align(Alignment.CenterStart).fillMaxWidth(fraction).height(6.dp).clip(HauntShapes.pill).background(c.accent))

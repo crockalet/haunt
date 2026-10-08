@@ -25,22 +25,20 @@ class OverlayGeometryTest {
     }
 
     @Test
-    fun fractionsRoundTripAndDefault() {
-        // 1080×2400 screen, 400×400 window → 680×2000 free.
-        assertEquals(680 to 1240, OverlayGeometry.toPixels(null, null, 1080, 2400, 400, 400))
-        assertEquals(0 to 2000, OverlayGeometry.toPixels(0f, 1f, 1080, 2400, 400, 400))
-        assertEquals(170 to 500, OverlayGeometry.toPixels(0.25f, 0.25f, 1080, 2400, 400, 400))
-        assertEquals(0.25f to 0.25f, OverlayGeometry.toFraction(170, 500, 1080, 2400, 400, 400))
-        // Rotation: same fraction, new pixels.
-        assertEquals(500 to 170, OverlayGeometry.toPixels(0.25f, 0.25f, 2400, 1080, 400, 400))
-        // Window bigger than the screen: no free space, stays at 0.
-        assertEquals(0f to 0f, OverlayGeometry.toFraction(10, 10, 300, 300, 400, 400))
-    }
-
-    @Test
     fun clampsOnScreen() {
         assertEquals(0 to 0, OverlayGeometry.clamp(-50, -10, 1080, 2400, 400, 400))
         assertEquals(680 to 2000, OverlayGeometry.clamp(900, 2300, 1080, 2400, 400, 400))
         assertEquals(100 to 200, OverlayGeometry.clamp(100, 200, 1080, 2400, 400, 400))
+    }
+
+    @Test
+    fun snapsToTheNearerSide() {
+        // 1080 wide, 300 wide window: centre left of 540 → left edge, otherwise flush right at 780.
+        assertEquals(0, OverlayGeometry.snapToSide(0, 1080, 300))
+        assertEquals(0, OverlayGeometry.snapToSide(389, 1080, 300))
+        assertEquals(780, OverlayGeometry.snapToSide(390, 1080, 300))
+        assertEquals(780, OverlayGeometry.snapToSide(780, 1080, 300))
+        // Window wider than the screen: nowhere to go.
+        assertEquals(0, OverlayGeometry.snapToSide(500, 300, 400))
     }
 }

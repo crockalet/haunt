@@ -1,8 +1,20 @@
 package io.github.crockalet.haunt.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.use
 import io.github.crockalet.haunt.core.Fix
 import io.github.crockalet.haunt.core.HauntState
@@ -10,6 +22,10 @@ import io.github.crockalet.haunt.core.LatLng
 import io.github.crockalet.haunt.core.LoopMode
 import io.github.crockalet.haunt.core.RouteProgress
 import io.github.crockalet.haunt.core.Speed
+import io.github.crockalet.haunt.ui.components.JoystickMover
+import io.github.crockalet.haunt.ui.components.JoystickPadImpl
+import io.github.crockalet.haunt.ui.components.JoystickPreview
+import io.github.crockalet.haunt.ui.components.Text
 import io.github.crockalet.haunt.ui.screens.LibraryTab
 import io.github.crockalet.haunt.ui.screens.OnboardingStep
 import io.github.crockalet.haunt.ui.screens.OnboardingUiState
@@ -17,6 +33,7 @@ import io.github.crockalet.haunt.ui.state.FakeHauntController
 import io.github.crockalet.haunt.ui.state.Geo
 import io.github.crockalet.haunt.ui.state.HauntAppData
 import io.github.crockalet.haunt.ui.state.HauntDefaults
+import io.github.crockalet.haunt.ui.state.JoystickStyle
 import io.github.crockalet.haunt.ui.state.LicenceDoc
 import io.github.crockalet.haunt.ui.state.LocalUiState
 import io.github.crockalet.haunt.ui.state.MapMode
@@ -24,6 +41,7 @@ import io.github.crockalet.haunt.ui.state.Notice
 import io.github.crockalet.haunt.ui.state.SampleData
 import io.github.crockalet.haunt.ui.state.ServiceKind
 import io.github.crockalet.haunt.ui.state.SpeedPreset
+import io.github.crockalet.haunt.ui.theme.HauntTheme
 import io.github.crockalet.haunt.ui.theme.ThemeMode
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -71,10 +89,11 @@ class Screenshots {
         screen: Screen = Screen.Map,
         onboarding: OnboardingUiState? = null,
         liveBlur: Boolean = true,
+        defaults: HauntDefaults = HauntDefaults(),
         configure: (HauntAppState) -> Unit = {},
     ) {
         val controller = FakeHauntController(engine, clock = { t0 })
-        val state = HauntAppState(controller, screen, mode, local, onboarding = onboarding).also(configure)
+        val state = HauntAppState(controller, screen, mode, local, defaults = defaults, onboarding = onboarding).also(configure)
         HauntApp(controller = controller, data = HauntAppData.Sample, state = state, liveBlur = liveBlur)
     }
 
@@ -139,6 +158,13 @@ class Screenshots {
     fun mapJoystick() {
         shot("05-map-joystick") { App(it, joystick, joyLocal) }
         shot("06-map-joystick-expanded") { App(it, joystick, joyLocal.copy(expanded = true)) }
+    }
+
+    /** Settings → Interface size at both ends of the slider (the other shots use the default). */
+    @Test
+    fun interfaceSizes() {
+        shot("18-map-joystick-size-075") { App(it, joystick, joyLocal, defaults = HauntDefaults(uiScale = 0.75f)) }
+        shot("19-map-joystick-size-150") { App(it, joystick, joyLocal, defaults = HauntDefaults(uiScale = 1.5f)) }
     }
 
     /** Joystick mode while a pin still runs: the pad waits (dimmed) for Start; floating is on but not allowed yet. */
@@ -212,6 +238,64 @@ class Screenshots {
         shot("noblur-08-library") {
             App(it, holding, pinLocal, Screen.Library, liveBlur = false) { s -> s.libraryTab = LibraryTab.Favourites }
         }
+    }
+
+    /** The pad on its own (size M) in each visual state, over the map colour; one sheet per style. */
+    @Test
+    fun joystickPads() {
+        for (style in JoystickStyle.entries) {
+            shot("joystick-pad-${style.name.lowercase()}", height = 600) { mode ->
+                HauntTheme(mode) {
+                    Box(Modifier.fillMaxSize().background(HauntTheme.colors.map).padding(top = 24.dp)) {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                Pad(style, JoystickPreview(), "idle")
+                                Pad(style, JoystickPreview(45.0, 0.8), "driving 45° · 0.8", readout = "NE · 5 km/h")
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                Pad(style, JoystickPreview(touched = true, moveMode = true), "move mode")
+                                Pad(style, JoystickPreview(), "first-run hint", showMoveHint = true)
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                Pad(style, JoystickPreview(200.0, 0.5), "driving 200° · 0.5")
+                                Pad(style, JoystickPreview(), "disabled", enabled = false)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun Pad(
+        style: JoystickStyle,
+        preview: JoystickPreview,
+        caption: String,
+        readout: String? = null,
+        showMoveHint: Boolean = false,
+        enabled: Boolean = true,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            JoystickPadImpl(
+                bearingDeg = 0.0,
+                magnitude = 0.0,
+                onInput = { _, _ -> },
+                style = style,
+                enabled = enabled,
+                mover = NoMover,
+                readout = readout,
+                showMoveHint = showMoveHint,
+                preview = preview,
+            )
+            Text(caption, style = HauntTheme.type.smallRegular, color = HauntTheme.colors.muted)
+        }
+    }
+
+    private object NoMover : JoystickMover {
+        override fun onMoveStart() {}
+        override fun onMove(delta: Offset) {}
+        override fun onMoveEnd() {}
     }
 
     @Test

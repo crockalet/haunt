@@ -10,6 +10,7 @@ import io.github.crockalet.haunt.android.settings.Units
 import io.github.crockalet.haunt.core.HauntDefaults
 import io.github.crockalet.haunt.core.Speed
 import io.github.crockalet.haunt.core.Travel
+import io.github.crockalet.haunt.ui.state.UiScale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -48,11 +49,12 @@ class SettingsTest {
             routingProfile = "foot",
             mapStyleUrl = "https://tiles.example.org/style.json",
             joystickSize = "Large",
+            joystickStyle = "Compass",
+            joystickMoveLearned = true,
             floatingJoystick = true,
-            joystickOffsetX = 24f,
-            joystickOffsetY = -180f,
-            overlayX = 0.25f,
-            overlayY = 1f,
+            joystickX = 0.25f,
+            joystickY = 1f,
+            uiScale = 1.25f,
         )
         val store = InMemoryKeyValueStore(SettingsKeys.entries(settings))
         assertEquals(settings, SettingsKeys.read(store))
@@ -77,7 +79,7 @@ class SettingsTest {
                 SettingsKeys.SEARCH_URL to "  ",
                 SettingsKeys.OVERLAY_X to "1.7",
                 SettingsKeys.OVERLAY_Y to "nope",
-                SettingsKeys.JOYSTICK_OFFSET_X to Float.NaN,
+                SettingsKeys.JOYSTICK_STYLE to " ",
             ),
         )
         val s = SettingsKeys.read(store)
@@ -87,9 +89,26 @@ class SettingsTest {
         assertEquals(Units.Metric, s.units)
         assertEquals(ThemeMode.Dark, s.theme) // case-insensitive
         assertEquals(HauntSettings.DEFAULT_SEARCH_URL, s.searchUrl)
-        assertEquals(1f, s.overlayX) // clamped to the screen
-        assertNull(s.overlayY)
-        assertEquals(0f, s.joystickOffsetX)
+        assertEquals(1f, s.joystickX) // clamped to the screen
+        assertNull(s.joystickY)
+        assertEquals(HauntSettings.DEFAULT_JOYSTICK_STYLE, s.joystickStyle)
+        assertFalse(s.joystickMoveLearned)
+    }
+
+    @Test
+    fun interfaceSizeIsClampedAndSnapped() {
+        fun read(v: Float) = SettingsKeys.read(InMemoryKeyValueStore(mapOf(SettingsKeys.UI_SCALE to v))).uiScale
+        assertEquals(1f, read(Float.NaN))
+        assertEquals(1f, read(Float.POSITIVE_INFINITY))
+        assertEquals(UiScale.MIN, read(0.1f))
+        assertEquals(UiScale.MAX, read(9f))
+        assertEquals(1.15f, read(1.137f))
+        assertEquals(1f, SettingsKeys.read(InMemoryKeyValueStore()).uiScale)
+
+        val kv = InMemoryKeyValueStore()
+        SettingsStore(kv).update { it.copy(uiScale = 3f) }
+        assertEquals(UiScale.MAX, kv.snapshot[SettingsKeys.UI_SCALE])
+        assertEquals(UiScale.MAX, SettingsStore(kv).current.uiScale)
     }
 
     @Test

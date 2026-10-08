@@ -43,6 +43,7 @@ import io.github.crockalet.haunt.ui.icons.HauntIcons
 import io.github.crockalet.haunt.ui.state.MapStyle
 import io.github.crockalet.haunt.ui.theme.HauntMotion
 import io.github.crockalet.haunt.ui.theme.HauntTheme
+import io.github.crockalet.haunt.ui.theme.ScaledChrome
 
 /** One piece of a map credit line: [text], linking to [url] when there is one. */
 @Immutable
@@ -121,11 +122,17 @@ class AttributionState(expanded: Boolean = true) {
 }
 
 /**
- * The map's credit line in the bottom-left corner, [bottomInset] up from the window bottom (clear of
- * the toolbar). Drawn on solid glass: the map behind it may be a SurfaceView.
+ * The map's credit line in the bottom-left corner, [bottomInset] (chrome dp) up from the window bottom
+ * (clear of the toolbar). Drawn on solid glass: the map behind it may be a SurfaceView.
  */
 @Composable
 internal fun MapAttributionOverlay(links: List<AttributionLink>, state: AttributionState, bottomInset: Dp) {
+    // Part of the chrome: same scale as the toolbar it clears, and [bottomInset] is in its dp.
+    ScaledChrome { AttributionOverlay(links, state, bottomInset) }
+}
+
+@Composable
+private fun AttributionOverlay(links: List<AttributionLink>, state: AttributionState, bottomInset: Dp) {
     val bottom = if (bottomInset > 0.dp) {
         Modifier.padding(bottom = bottomInset + 8.dp)
     } else {

@@ -3,6 +3,7 @@ package io.github.crockalet.haunt.android.settings
 import io.github.crockalet.haunt.android.net.RoutingEndpoint
 import io.github.crockalet.haunt.core.HauntDefaults
 import io.github.crockalet.haunt.core.Travel
+import io.github.crockalet.haunt.ui.state.UiScale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,14 +41,17 @@ data class HauntSettings(
     val mapStyleUrl: String = DEFAULT_MAP_STYLE_URL,
     /** Joystick pad size: a `JoystickSize` name from the shared UI (S / M / L / XL). */
     val joystickSize: String = DEFAULT_JOYSTICK_SIZE,
+    /** How the pad is drawn: a `JoystickStyle` name from the shared UI (Halo / Compass). */
+    val joystickStyle: String = DEFAULT_JOYSTICK_STYLE,
+    /** The user has moved the pad with a hold once; the pad stops showing the hint. */
+    val joystickMoveLearned: Boolean = false,
     /** Show the joystick over other apps while joystick mode runs and Haunt is in the background. */
     val floatingJoystick: Boolean = false,
-    /** In-app pad offset from its default spot (dp). */
-    val joystickOffsetX: Float = 0f,
-    val joystickOffsetY: Float = 0f,
-    /** Floating pad position as a fraction (0..1) of the screen's free width / height; null = default spot. */
-    val overlayX: Float? = null,
-    val overlayY: Float? = null,
+    /** Pad position, in app and floating, as a `JoystickPlacement` fraction of the screen's free width / height; null = default. */
+    val joystickX: Float? = null,
+    val joystickY: Float? = null,
+    /** Interface size, a `UiScale` multiplier on top of the shared UI's base scale (1 = default). */
+    val uiScale: Float = UiScale.DEFAULT,
 ) {
     val defaults: HauntDefaults get() = HauntDefaults(accuracy = accuracyMeters, altitude = altitudeMeters)
 
@@ -71,6 +75,7 @@ data class HauntSettings(
         /** Default before Haunt had its own style; read as [DEFAULT_MAP_STYLE_URL]. */
         const val LEGACY_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
         const val DEFAULT_JOYSTICK_SIZE = "Medium"
+        const val DEFAULT_JOYSTICK_STYLE = "Halo"
         const val MIN_UPDATE_INTERVAL_MILLIS = 100L
         const val MAX_UPDATE_INTERVAL_MILLIS = 10_000L
     }
@@ -90,12 +95,13 @@ object SettingsKeys {
     const val ROUTING_PROFILE = "routing_profile"
     const val MAP_STYLE_URL = "map_style_url"
     const val JOYSTICK_SIZE = "joystick_size"
+    const val JOYSTICK_STYLE = "joystick_style"
+    const val JOYSTICK_MOVE_LEARNED = "joystick_move_learned"
     const val FLOATING_JOYSTICK = "floating_joystick"
-    const val JOYSTICK_OFFSET_X = "joystick_offset_x_dp"
-    const val JOYSTICK_OFFSET_Y = "joystick_offset_y_dp"
     /** Stored as strings so "not placed yet" is representable. */
     const val OVERLAY_X = "overlay_x"
     const val OVERLAY_Y = "overlay_y"
+    const val UI_SCALE = "ui_scale"
 
     /** Reads settings, falling back to defaults for missing or invalid values. */
     fun read(store: KeyValueStore): HauntSettings {
@@ -114,11 +120,12 @@ object SettingsKeys {
             mapStyleUrl = store.getString(MAP_STYLE_URL)?.trim()?.takeIf { it.isNotEmpty() && it != HauntSettings.LEGACY_MAP_STYLE_URL }
                 ?: d.mapStyleUrl,
             joystickSize = store.getString(JOYSTICK_SIZE)?.trim()?.takeIf { it.isNotEmpty() } ?: d.joystickSize,
+            joystickStyle = store.getString(JOYSTICK_STYLE)?.trim()?.takeIf { it.isNotEmpty() } ?: d.joystickStyle,
+            joystickMoveLearned = store.getBoolean(JOYSTICK_MOVE_LEARNED, d.joystickMoveLearned),
             floatingJoystick = store.getBoolean(FLOATING_JOYSTICK, d.floatingJoystick),
-            joystickOffsetX = store.getFloat(JOYSTICK_OFFSET_X, d.joystickOffsetX).takeIf { it.isFinite() } ?: d.joystickOffsetX,
-            joystickOffsetY = store.getFloat(JOYSTICK_OFFSET_Y, d.joystickOffsetY).takeIf { it.isFinite() } ?: d.joystickOffsetY,
-            overlayX = fraction(store.getString(OVERLAY_X)),
-            overlayY = fraction(store.getString(OVERLAY_Y)),
+            joystickX = fraction(store.getString(OVERLAY_X)),
+            joystickY = fraction(store.getString(OVERLAY_Y)),
+            uiScale = UiScale.clamp(store.getFloat(UI_SCALE, d.uiScale)),
         )
     }
 
@@ -135,11 +142,12 @@ object SettingsKeys {
         ROUTING_PROFILE to settings.routingProfile,
         MAP_STYLE_URL to settings.mapStyleUrl,
         JOYSTICK_SIZE to settings.joystickSize,
+        JOYSTICK_STYLE to settings.joystickStyle,
+        JOYSTICK_MOVE_LEARNED to settings.joystickMoveLearned,
         FLOATING_JOYSTICK to settings.floatingJoystick,
-        JOYSTICK_OFFSET_X to settings.joystickOffsetX,
-        JOYSTICK_OFFSET_Y to settings.joystickOffsetY,
-        OVERLAY_X to settings.overlayX?.toString(),
-        OVERLAY_Y to settings.overlayY?.toString(),
+        OVERLAY_X to settings.joystickX?.toString(),
+        OVERLAY_Y to settings.joystickY?.toString(),
+        UI_SCALE to settings.uiScale,
     )
 
     private fun fraction(s: String?): Float? = s?.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
