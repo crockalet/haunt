@@ -33,6 +33,16 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // Play upload key, kept outside the repo: -Phaunt.uploadStoreFile=… plus HAUNT_UPLOAD_PASSWORD.
+        val uploadStore = providers.gradleProperty("haunt.uploadStoreFile").orNull
+        if (uploadStore != null) {
+            create("upload") {
+                storeFile = file(uploadStore)
+                storePassword = providers.environmentVariable("HAUNT_UPLOAD_PASSWORD").get()
+                keyAlias = providers.gradleProperty("haunt.uploadKeyAlias").getOrElse("upload")
+                keyPassword = storePassword
+            }
+        }
     }
 
     buildTypes {
@@ -40,8 +50,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Shared key so nightlies update in place; real release signing comes later (M5).
-            signingConfig = signingConfigs.getByName("debug")
+            // Without the upload key, the shared debug key so nightlies update in place.
+            signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
         }
     }
 

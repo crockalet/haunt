@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haunt privacy policy</title>
+<style>
+  :root { --bg: #f6f7f9; --fg: #1b1e24; --muted: #5b6270; --accent: #2f6bff; --card: #ffffff; --line: #e3e6eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --fg: #e8eaee; --muted: #9aa1ad; --accent: #7aa2ff; --card: #171a20; --line: #262a32; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+  p, li { color: var(--fg); }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  ul { padding-left: 1.2rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 20px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Haunt privacy policy</h1>
+<p class="muted">Haunt: Fake GPS Location · Effective 13 October 2026</p>
+
+<div class="card">
+<p><strong>In short:</strong> Haunt has no accounts, no ads, no analytics and no crash reporting. It never sends your real
+location anywhere. To search places, plan routes and draw the map it talks to public map services, which receive the
+coordinates you work with and your IP address. Everything else stays on your phone.</p>
+</div>
+
+<h2>Who we are</h2>
+<p>Haunt is a free, open-source app (GPL-3.0) developed by crockalet. The source code is at
+<a href="https://github.com/crockalet/haunt">github.com/crockalet/haunt</a>, so you can check everything this page says.
+We do not run any servers of our own.</p>
+
+<h2>Your real location</h2>
+<p>Haunt asks for location permission so it can show where you really are on the map and start a fake location from
+there. Your real location is only used on your device. Haunt does not send it, store it on a server, or share it.</p>
+
+<h2>Data that leaves your phone</h2>
+<p>Some features send requests directly from your phone to third-party services. Haunt adds no identifier to these
+requests; like any internet request they include your IP address and an app identifier
+(<code>Haunt/&lt;version&gt;</code>).</p>
+<ul>
+  <li><strong>Place search</strong> (<a href="https://photon.komoot.io">Photon</a>, run by komoot): the text you type and
+    the coordinates of the area you're looking at, so nearby results come first. Looking up the address of a point sends
+    that point's coordinates.</li>
+  <li><strong>Routes</strong> (<a href="https://routing.openstreetmap.de">FOSSGIS routing</a> for walking and cycling,
+    the <a href="https://project-osrm.org">OSRM</a> demo server for driving): the start, stop and end points of the route.</li>
+  <li><strong>Map</strong> (<a href="https://openfreemap.org">OpenFreeMap</a>): map tiles and fonts for the area shown on
+    screen.</li>
+</ul>
+<p>These are the default services. You can point Haunt at other servers in Settings; requests then go to the servers you
+choose. Each service handles requests under its own privacy policy. The coordinates sent are normally the places you
+are faking, but if you search or route near where you really are, they can reveal that area.</p>
+
+<h2>Data stored on your phone</h2>
+<p>Favourites, recent places, imported tracks (GPX/KML), settings and the activity log are stored only in Haunt's app
+storage. They are not sent anywhere. Android may include them in your device backup if you have backups turned on.
+Uninstalling Haunt or clearing its storage deletes them.</p>
+
+<h2>Google Play services</h2>
+<p>The version of Haunt from Google Play uses Google Play services to set the fake location for apps that use Google's
+location APIs. Google Play services is part of your device and handles data under
+<a href="https://policies.google.com/privacy">Google's privacy policy</a>.</p>
+
+<h2>Control over ADB</h2>
+<p>Haunt can be controlled from a computer connected through Android Debug Bridge (ADB). That connection stays between
+your phone and the computer you authorised. Haunt does not open any network port.</p>
+
+<h2>Children</h2>
+<p>Haunt is a tool for developers and testers and is not directed at children.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, we'll update this page and its effective date. The full history is in the source repository.</p>
+
+<h2>Contact</h2>
+<p>Questions about privacy: <a href="mailto:__CONTACT_EMAIL__">__CONTACT_EMAIL__</a>, or open an issue at
+<a href="https://github.com/crockalet/haunt/issues">github.com/crockalet/haunt/issues</a>.</p>
+</main>
+</body>
+</html>
