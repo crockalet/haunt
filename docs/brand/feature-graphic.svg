@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <title>Haunt Play feature graphic</title>
+  <defs>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#101318" flood-opacity=".10"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="500" fill="#F1F1EF"/>
+  <path d="M-10-10H330C300 120 190 190-10 210z" fill="#E2EADC"/>
+  <path d="M1034 300C900 320 820 400 790 510H1034z" fill="#D6E3EC"/>
+  <path d="M-10 330 1034 120" stroke="#FFFFFF" stroke-width="22"/>
+  <path d="M250-10 330 510" stroke="#FFFFFF" stroke-width="14"/>
+  <path d="M600-10 640 510" stroke="#FFFFFF" stroke-width="10"/>
+
+  <!-- ghost on a glass disc, dashed path to the pin -->
+  <circle cx="300" cy="262" r="118" fill="#2F6BFF" fill-opacity=".08"/>
+  <circle cx="300" cy="262" r="86" fill="#FFFFFF" fill-opacity=".85" filter="url(#soft)"/>
+  <g transform="translate(300 266) scale(2.1) translate(-50 -52)">
+    <path d="M30 48a20 20 0 0 1 40 0v28l-6.67-5-6.66 5-6.67-5-6.67 5-6.66-5L30 76z" fill="#F7F7F8" stroke="#535A68" stroke-opacity=".55" stroke-width="2.4" stroke-linejoin="round"/>
+    <ellipse cx="43" cy="48" rx="3.4" ry="5" fill="#535A68"/>
+    <ellipse cx="57" cy="48" rx="3.4" ry="5" fill="#535A68"/>
+  </g>
+  <path d="M362 200Q390 152 426 140" fill="none" stroke="#2F6BFF" stroke-width="8" stroke-linecap="round" stroke-dasharray="0.1 18"/>
+  <g transform="translate(458 118)">
+    <path d="M0-46a30 30 0 0 1 30 30c0 21-30 54-30 54s-30-33-30-54a30 30 0 0 1 30-30z" fill="#2F6BFF" filter="url(#soft)"/>
+    <circle cx="0" cy="-16" r="10.5" fill="#FFFFFF"/>
+  </g>
+
+  <text x="524" y="226" font-family="Plus Jakarta Sans" font-weight="700" font-size="88" fill="#101318" letter-spacing="-2">Haunt</text>
+  <text x="528" y="276" font-family="Plus Jakarta Sans" font-weight="600" font-size="27" fill="#101318">Fake GPS location for Android</text>
+  <text x="528" y="314" font-family="Plus Jakarta Sans" font-weight="500" font-size="21" fill="#535A68">Pins, routes, joystick, GPX playback</text>
+  <g transform="translate(528 340)">
+    <rect width="326" height="42" rx="21" fill="#FFFFFF" fill-opacity=".9" stroke="#101318" stroke-opacity=".08"/>
+    <circle cx="22" cy="21" r="6" fill="#2F6BFF"/>
+    <text x="37" y="28" font-family="JetBrains Mono" font-weight="500" font-size="17" fill="#101318">adb · CLI · MCP for agents</text>
+  </g>
+</svg>

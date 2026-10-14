@@ -1,0 +1,1 @@
+Mock location for testing: pins, routes, joystick, GPX, and adb control for AI

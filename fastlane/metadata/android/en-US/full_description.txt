@@ -1,0 +1,26 @@
+Haunt sets your phone's location to anywhere you choose, for testing location-aware apps, demos and privacy. It's free, open source (GPL-3.0), and has no ads, no accounts and no tracking.
+
+Four ways to move
+• Pin: drop a pin, search for a place or paste coordinates, then press Start.
+• Route: walk, cycle or drive between stops along real roads, or in straight lines, at a speed you set.
+• Joystick: steer by hand, with a floating pad that stays on top of other apps.
+• Tracks: import GPX or KML recordings and play them back at 1×, 2× or faster, once, on a loop or back and forth.
+
+Built for developers and testers
+• Feeds the GPS, network and fused providers, so apps see a consistent location. The Google Play version also sets Google Play services' fused location.
+• Paste coordinates in almost any format: decimal, degrees-minutes-seconds, Google Maps links, geo: links and plus codes.
+• Favourites, recent places and an activity log of what Haunt did and any errors.
+• Control everything from your computer over adb with the free haunt command-line tool, including a built-in MCP server so AI coding agents can move the device themselves: teleport, follow a route, wait for arrival.
+
+Open map services, your choice of servers
+Maps come from OpenFreeMap and OpenStreetMap, routing from OSRM, and place search from Photon. No API keys are needed. Every service address can be changed in Settings if you run your own.
+
+Privacy
+Your real location never leaves your phone. Search text and the coordinates you route between are sent only to the map services above to answer your request. Full policy: https://crockalet.github.io/haunt/privacy.html
+
+Getting started
+Haunt uses Android's built-in mock location feature. The first-run guide walks you through turning on Developer options and choosing Haunt as the mock location app.
+
+Source code, the command-line tool and issue tracker: https://github.com/crockalet/haunt
+
+Map data © OpenStreetMap contributors.
